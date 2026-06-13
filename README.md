@@ -71,6 +71,19 @@ Per channel (A = Left/Lateral, B = Right/Vertical):
 Global: Channel Mode (Left/Right, Lat/Vert (M/S), L/R Linked), Engine
 (Eco / Zero Latency / Studio), Purist Mode, True Bypass.
 
+Each channel strip shows a VU gain-reduction needle flanked by input and
+output level meters (dBFS, with peak hold).
+
+## Presets
+
+Ten factory presets are exposed through the host's program interface (so they
+appear in the DAW's preset menu) and via the preset bar in the UI: Init,
+Vocal Leveler, Vocal Parallel, Drum Bus Smash, Drum Parallel Punch, Mix Glue,
+Master Bus, Bass DI, Brick Limiter and Clean Color. Loading a preset resets
+every sound parameter to its default and then applies the preset, so each one
+is a complete, deterministic starting point. They are defined in
+`Source/Presets.h`.
+
 ## Signal path
 
 ```
@@ -123,9 +136,10 @@ built alongside; AU is produced on macOS.
 ```
 CMakeLists.txt              JUCE 8 CMake project (VST3 / AU / Standalone + test app)
 Source/
-  PluginProcessor.*         parameter layout, routing, oversampling, dry/wet
-  PluginEditor.*            hardware-styled UI with VU gain-reduction needles
+  PluginProcessor.*         parameter layout, routing, oversampling, dry/wet, presets
+  PluginEditor.*            hardware-styled UI: GR needles, I/O meters, preset bar
   Parameters.h              parameter IDs
+  Presets.h                 factory preset definitions
   DSP/
     TimeConstants.h         the six attack/release networks
     ControlVoltageNetwork.h multi-branch CV integrator (program-dependent release)

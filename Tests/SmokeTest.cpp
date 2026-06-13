@@ -361,6 +361,75 @@ int main()
         setParam (proc, "quality", 1.0f);
     }
 
+    // -- Factory presets -----------------------------------------------------
+    {
+        auto programIndex = [&proc] (const juce::String& name)
+        {
+            for (int i = 0; i < proc.getNumPrograms(); ++i)
+                if (proc.getProgramName (i) == name)
+                    return i;
+            return -1;
+        };
+
+        expect (proc.getNumPrograms() >= 8,
+                "factory presets are exposed (" + std::to_string (proc.getNumPrograms()) + ")");
+
+        const int master = programIndex ("Master Bus");
+        expect (master >= 0, "Master Bus preset is present");
+
+        proc.setCurrentProgram (master);
+        expect (proc.getCurrentProgram() == master, "setCurrentProgram updates the current program");
+        expect ((int) *proc.apvts.getRawParameterValue ("mode") == 2,
+                "Master Bus selects Linked mode");
+        expect ((int) *proc.apvts.getRawParameterValue ("quality") == 2,
+                "Master Bus selects the Studio engine");
+        expect ((int) *proc.apvts.getRawParameterValue ("timeconstA") == 5,
+                "Master Bus selects an auto-release time constant");
+
+        // Determinism: a preset fully defines the patch regardless of prior edits.
+        const int smash = programIndex ("Drum Bus Smash");
+        proc.setCurrentProgram (smash);
+        const float ref = proc.apvts.getRawParameterValue ("thresholdA")->load();
+
+        setParam (proc, "thresholdA", 1.0f);          // dirty the state
+        proc.setCurrentProgram (0);                    // Init
+        proc.setCurrentProgram (smash);                // reload
+        const float reloaded = proc.apvts.getRawParameterValue ("thresholdA")->load();
+
+        expect (std::abs (reloaded - ref) < 1.0e-4f, "reloading a preset is deterministic");
+
+        proc.setCurrentProgram (0);
+        setParam (proc, "bypass", 0.0f);
+    }
+
+    // -- Metering ------------------------------------------------------------
+    {
+        setParam (proc, "quality", 0.0f); // Eco, no latency
+        setParam (proc, "mode", 0.0f);    // independent channels
+        setParam (proc, "inputA", 0.0f);
+        setParam (proc, "inputB", 0.0f);
+        setParam (proc, "compinA", 0.0f); // colour only, so output tracks input
+        setParam (proc, "compinB", 0.0f);
+
+        runSine (proc, buffer, 0.5f, 0.2, 220.0, fs); // 0.5 peak = -6.02 dBFS
+
+        const float inDb  = proc.getInputLevelDb (0);
+        const float outDb = proc.getOutputLevelDb (0);
+
+        expect (inDb > -7.0f && inDb < -5.0f,
+                "input meter reads the input level (~-6 dBFS, got " + std::to_string (inDb) + ")");
+        expect (std::isfinite (outDb) && outDb > -24.0f,
+                "output meter is active (" + std::to_string (outDb) + " dBFS)");
+
+        setParam (proc, "bypass", 1.0f);
+        runSine (proc, buffer, 0.25f, 0.05, 220.0, fs); // -12 dBFS through bypass
+        const float bypIn  = proc.getInputLevelDb (0);
+        const float bypOut = proc.getOutputLevelDb (0);
+        expect (std::abs (bypIn - bypOut) < 0.5f && bypIn > -16.0f,
+                "meters track the signal through true bypass");
+        setParam (proc, "bypass", 0.0f);
+    }
+
     std::cout << "\n" << (failures == 0 ? "ALL TESTS PASSED" : "TESTS FAILED")
               << std::endl;
 

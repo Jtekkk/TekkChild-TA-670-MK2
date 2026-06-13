@@ -149,11 +149,79 @@ void GainReductionMeter::paint (juce::Graphics& g)
 }
 
 //==============================================================================
+LevelMeter::LevelMeter (std::function<float()> levelSource, juce::String caption)
+    : source (std::move (levelSource)), captionText (std::move (caption))
+{
+    startTimerHz (30);
+}
+
+void LevelMeter::timerCallback()
+{
+    const float target = source != nullptr ? source() : -100.0f;
+
+    levelDb = target > levelDb ? target : levelDb + 0.25f * (target - levelDb);
+
+    if (target >= peakDb)      { peakDb = target; peakHold = 30; } // ~1 s hold at 30 Hz
+    else if (peakHold > 0)     { --peakHold; }
+    else                       { peakDb -= 0.6f; }                 // then fall ~18 dB/s
+
+    repaint();
+}
+
+void LevelMeter::paint (juce::Graphics& g)
+{
+    auto r = getLocalBounds().toFloat();
+    auto caption = r.removeFromBottom (14.0f);
+
+    g.setColour (juce::Colour (0xff141416));
+    g.fillRoundedRectangle (r, 3.0f);
+
+    constexpr float minDb = -60.0f, maxDb = 6.0f;
+    auto yFor = [&] (float db)
+    {
+        const float t = juce::jlimit (0.0f, 1.0f, (db - minDb) / (maxDb - minDb));
+        return r.getBottom() - t * r.getHeight();
+    };
+
+    // filled segments, coloured by zone
+    auto fillTo = [&] (float lo, float hi, juce::Colour c)
+    {
+        const float top = yFor (std::min (levelDb, hi));
+        const float bot = yFor (lo);
+        if (levelDb > lo && bot > top)
+        {
+            g.setColour (c);
+            g.fillRect (r.getX() + 1.5f, top, r.getWidth() - 3.0f, bot - top);
+        }
+    };
+
+    fillTo (minDb, -12.0f, juce::Colour (0xff4a9e6a)); // green
+    fillTo (-12.0f, -3.0f, colours::amber);            // amber
+    fillTo (-3.0f, maxDb, colours::needle);            // red
+
+    // 0 dBFS reference and peak marker
+    g.setColour (juce::Colours::white.withAlpha (0.25f));
+    g.drawHorizontalLine ((int) yFor (0.0f), r.getX(), r.getRight());
+
+    if (peakDb > minDb)
+    {
+        g.setColour (peakDb > -1.0f ? colours::needle : colours::cream);
+        g.fillRect (r.getX() + 1.5f, yFor (peakDb) - 1.0f, r.getWidth() - 3.0f, 2.0f);
+    }
+
+    g.setColour (colours::textDim);
+    g.setFont (juce::Font (juce::FontOptions (9.5f)));
+    g.drawText (captionText, caption, juce::Justification::centred);
+}
+
+//==============================================================================
 ChannelStrip::ChannelStrip (TekkChild670Processor& p, int channelIndex, const juce::String& t)
     : processor (p),
       channel (channelIndex),
       title (t),
-      meter ([&p, channelIndex] { return p.getGainReductionDb (channelIndex); })
+      meter   ([&p, channelIndex] { return p.getGainReductionDb (channelIndex); }),
+      inMeter ([&p, channelIndex] { return p.getInputLevelDb (channelIndex); }, "IN"),
+      outMeter ([&p, channelIndex] { return p.getOutputLevelDb (channelIndex); }, "OUT")
 {
     setupKnob (input,        inputLb,        "INPUT");
     setupKnob (threshold,    thresholdLb,    "THRESHOLD");
@@ -187,6 +255,8 @@ ChannelStrip::ChannelStrip (TekkChild670Processor& p, int channelIndex, const ju
     compInAt = std::make_unique<ButtonAttachment> (apvts, pid::forChannel (pid::compIn, channel), compInBtn);
 
     addAndMakeVisible (meter);
+    addAndMakeVisible (inMeter);
+    addAndMakeVisible (outMeter);
 }
 
 void ChannelStrip::setupKnob (juce::Slider& s, juce::Label& l, const juce::String& name)
@@ -222,7 +292,10 @@ void ChannelStrip::resized()
     auto r = getLocalBounds().reduced (10);
     r.removeFromTop (24); // title band, painted
 
-    meter.setBounds (r.removeFromTop (116).reduced (18, 2));
+    auto meterRow = r.removeFromTop (116);
+    inMeter.setBounds  (meterRow.removeFromLeft (30).reduced (3, 4));
+    outMeter.setBounds (meterRow.removeFromRight (30).reduced (3, 4));
+    meter.setBounds    (meterRow.reduced (10, 2));
 
     auto layoutRow = [] (juce::Rectangle<int> row,
                          std::initializer_list<juce::Slider*> sliders,
@@ -295,7 +368,51 @@ TekkChild670Editor::TekkChild670Editor (TekkChild670Processor& p)
     bypassAt = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         processor.apvts, tekk::pid::bypass, bypassBtn);
 
-    setSize (960, 596);
+    // -- preset bar --
+    presetLb.setText ("PRESET", juce::dontSendNotification);
+    presetLb.setFont (juce::Font (juce::FontOptions (12.0f)));
+    addAndMakeVisible (presetLb);
+
+    for (int i = 0; i < processor.getNumPrograms(); ++i)
+        presetBox.addItem (processor.getProgramName (i), i + 1);
+
+    presetBox.onChange = [this]
+    {
+        const int idx = presetBox.getSelectedId() - 1;
+        if (idx >= 0 && idx != processor.getCurrentProgram())
+            loadProgram (idx);
+    };
+    addAndMakeVisible (presetBox);
+
+    prevPreset.onClick = [this] { loadProgram (processor.getCurrentProgram() - 1); };
+    nextPreset.onClick = [this] { loadProgram (processor.getCurrentProgram() + 1); };
+    addAndMakeVisible (prevPreset);
+    addAndMakeVisible (nextPreset);
+
+    refreshPresetBox();
+    startTimerHz (8); // keep the box in step with host-driven program changes
+
+    setSize (960, 632);
+}
+
+void TekkChild670Editor::loadProgram (int index)
+{
+    if (juce::isPositiveAndBelow (index, processor.getNumPrograms()))
+    {
+        processor.setCurrentProgram (index);
+        refreshPresetBox();
+    }
+}
+
+void TekkChild670Editor::refreshPresetBox()
+{
+    presetBox.setSelectedId (processor.getCurrentProgram() + 1, juce::dontSendNotification);
+}
+
+void TekkChild670Editor::timerCallback()
+{
+    if (presetBox.getSelectedId() - 1 != processor.getCurrentProgram())
+        refreshPresetBox();
 }
 
 TekkChild670Editor::~TekkChild670Editor()
@@ -333,6 +450,12 @@ void TekkChild670Editor::resized()
 {
     auto r = getLocalBounds();
     r.removeFromTop (52); // header, painted
+
+    auto presetBar = r.removeFromTop (36).reduced (16, 4);
+    presetLb.setBounds (presetBar.removeFromLeft (52));
+    prevPreset.setBounds (presetBar.removeFromLeft (30).reduced (1));
+    presetBox.setBounds (presetBar.removeFromLeft (240).reduced (2, 1));
+    nextPreset.setBounds (presetBar.removeFromLeft (30).reduced (1));
 
     auto footer = r.removeFromBottom (52).reduced (14, 10);
 

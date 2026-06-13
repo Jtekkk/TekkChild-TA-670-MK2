@@ -30,10 +30,10 @@ public:
     bool isMidiEffect() const override  { return false; }
     double getTailLengthSeconds() const override { return 0.0; }
 
-    int getNumPrograms() override                          { return 1; }
-    int getCurrentProgram() override                       { return 0; }
-    void setCurrentProgram (int) override                  {}
-    const juce::String getProgramName (int) override       { return "Default"; }
+    int getNumPrograms() override;
+    int getCurrentProgram() override;
+    void setCurrentProgram (int index) override;
+    const juce::String getProgramName (int index) override;
     void changeProgramName (int, const juce::String&) override {}
 
     void getStateInformation (juce::MemoryBlock& destData) override;
@@ -42,10 +42,20 @@ public:
     juce::AudioProcessorParameter* getBypassParameter() const override { return bypassParam; }
 
     //==========================================================================
-    // Smoothed, per-block maximum gain reduction for the editor's VU needles.
+    // Per-block meter feeds for the editor (gain reduction needle + I/O bars).
     float getGainReductionDb (int channel) const noexcept
     {
-        return grMeterDb[channel < 0 ? 0 : (channel > 1 ? 1 : channel)].load();
+        return grMeterDb[clampCh (channel)].load();
+    }
+
+    float getInputLevelDb (int channel) const noexcept
+    {
+        return inMeterDb[clampCh (channel)].load();
+    }
+
+    float getOutputLevelDb (int channel) const noexcept
+    {
+        return outMeterDb[clampCh (channel)].load();
     }
 
     juce::AudioProcessorValueTreeState apvts;
@@ -75,7 +85,13 @@ private:
     // rate so automating Threshold / DC Threshold glides instead of zippering.
     juce::SmoothedValue<float> thresholdSm[2], biasSm[2], kneeSm[2];
 
+    static int clampCh (int ch) noexcept { return ch < 0 ? 0 : (ch > 1 ? 1 : ch); }
+
     std::atomic<float> grMeterDb[2] { 0.0f, 0.0f };
+    std::atomic<float> inMeterDb[2] { -100.0f, -100.0f };
+    std::atomic<float> outMeterDb[2] { -100.0f, -100.0f };
+
+    int currentProgram = 0;
 
     double baseSampleRate = 44100.0;
     int    maxBlockSize   = 512;

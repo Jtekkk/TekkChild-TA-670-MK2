@@ -2,6 +2,7 @@
 
 #include "Parameters.h"
 #include "PluginEditor.h"
+#include "Presets.h"
 
 namespace
 {
@@ -303,8 +304,14 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
             }
         }
 
-        grMeterDb[0].store (0.0f);
-        grMeterDb[1].store (0.0f);
+        for (int ch = 0; ch < 2; ++ch)
+        {
+            const float lvl = juce::Decibels::gainToDecibels (
+                buffer.getMagnitude (juce::jmin (ch, numCh - 1), 0, n), -100.0f);
+            grMeterDb[ch].store (0.0f);
+            inMeterDb[ch].store (lvl);
+            outMeterDb[ch].store (lvl);
+        }
         return;
     }
 
@@ -338,6 +345,12 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
     // input gain drives both colour and compression depth, as on the hardware
     for (int ch = 0; ch < numCh; ++ch)
         inputGainSm[ch].applyGain (buffer.getWritePointer (ch), n);
+
+    // input meter reflects the post-gain drive into the unit (pre M/S encode)
+    for (int ch = 0; ch < numCh; ++ch)
+        inMeterDb[ch].store (juce::Decibels::gainToDecibels (buffer.getMagnitude (ch, 0, n), -100.0f));
+    if (numCh == 1)
+        inMeterDb[1].store (inMeterDb[0].load());
 
     if (msMode)
     {
@@ -435,6 +448,59 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
 
     grMeterDb[0].store (maxGr[0]);
     grMeterDb[1].store (numCh > 1 ? maxGr[1] : maxGr[0]);
+
+    for (int ch = 0; ch < numCh; ++ch)
+        outMeterDb[ch].store (juce::Decibels::gainToDecibels (buffer.getMagnitude (ch, 0, n), -100.0f));
+    if (numCh == 1)
+        outMeterDb[1].store (outMeterDb[0].load());
+}
+
+//==============================================================================
+int TekkChild670Processor::getNumPrograms()
+{
+    return (int) tekk::factoryPresets().size();
+}
+
+int TekkChild670Processor::getCurrentProgram()
+{
+    return currentProgram;
+}
+
+const juce::String TekkChild670Processor::getProgramName (int index)
+{
+    const auto& presets = tekk::factoryPresets();
+    return juce::isPositiveAndBelow (index, (int) presets.size())
+               ? presets[(size_t) index].name : juce::String();
+}
+
+void TekkChild670Processor::setCurrentProgram (int index)
+{
+    const auto& presets = tekk::factoryPresets();
+    if (! juce::isPositiveAndBelow (index, (int) presets.size()))
+        return;
+
+    currentProgram = index;
+    const auto& preset = presets[(size_t) index];
+
+    // Reset every sound parameter to its default (bypass is left alone), so a
+    // preset fully and deterministically defines the patch, then apply overrides.
+    for (auto* p : getParameters())
+        if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (p))
+            if (ranged->getParameterID() != tekk::pid::bypass)
+                ranged->setValueNotifyingHost (ranged->getDefaultValue());
+
+    auto apply = [this] (const juce::String& id, float plain)
+    {
+        if (auto* p = apvts.getParameter (id))
+            p->setValueNotifyingHost (p->convertTo0to1 (plain));
+    };
+
+    for (const auto& entry : preset.channel)
+        for (int ch = 0; ch < 2; ++ch)
+            apply (tekk::pid::forChannel (entry.first.toRawUTF8(), ch), entry.second);
+
+    for (const auto& entry : preset.global)
+        apply (entry.first, entry.second);
 }
 
 //==============================================================================
@@ -445,7 +511,10 @@ juce::AudioProcessorEditor* TekkChild670Processor::createEditor()
 
 void TekkChild670Processor::getStateInformation (juce::MemoryBlock& destData)
 {
-    if (auto xml = apvts.copyState().createXml())
+    auto state = apvts.copyState();
+    state.setProperty ("currentProgram", currentProgram, nullptr);
+
+    if (auto xml = state.createXml())
         copyXmlToBinary (*xml, destData);
 }
 
@@ -453,7 +522,11 @@ void TekkChild670Processor::setStateInformation (const void* data, int sizeInByt
 {
     if (auto xml = getXmlFromBinary (data, sizeInBytes))
         if (xml->hasTagName (apvts.state.getType()))
-            apvts.replaceState (juce::ValueTree::fromXml (*xml));
+        {
+            auto tree = juce::ValueTree::fromXml (*xml);
+            currentProgram = (int) tree.getProperty ("currentProgram", 0);
+            apvts.replaceState (tree);
+        }
 }
 
 //==============================================================================

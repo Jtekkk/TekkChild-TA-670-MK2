@@ -36,6 +36,26 @@ private:
     float needleDb = 0.0f;
 };
 
+// Vertical peak level meter (dBFS) with fast attack, slow release and a
+// short peak hold. Used for the per-channel input and output bars.
+class LevelMeter : public juce::Component,
+                   private juce::Timer
+{
+public:
+    LevelMeter (std::function<float()> levelSource, juce::String caption);
+
+    void paint (juce::Graphics&) override;
+
+private:
+    void timerCallback() override;
+
+    std::function<float()> source;
+    juce::String captionText;
+    float levelDb   = -100.0f;
+    float peakDb    = -100.0f;
+    int   peakHold  = 0;
+};
+
 class ChannelStrip : public juce::Component
 {
 public:
@@ -56,6 +76,7 @@ private:
     juce::String title;
 
     GainReductionMeter meter;
+    LevelMeter inMeter, outMeter;
 
     juce::Slider input, threshold, timeConstant, dcThreshold, mix, output;
     juce::Label  inputLb, thresholdLb, timeConstantLb, dcThresholdLb, mixLb, outputLb;
@@ -75,7 +96,8 @@ private:
 } // namespace tekk
 
 //==============================================================================
-class TekkChild670Editor : public juce::AudioProcessorEditor
+class TekkChild670Editor : public juce::AudioProcessorEditor,
+                           private juce::Timer
 {
 public:
     explicit TekkChild670Editor (TekkChild670Processor&);
@@ -85,11 +107,19 @@ public:
     void resized() override;
 
 private:
+    void timerCallback() override;          // keeps the preset box in sync
+    void loadProgram (int index);
+    void refreshPresetBox();
+
     TekkChild670Processor& processor;
 
     tekk::TekkLookAndFeel lookAndFeel;
 
     tekk::ChannelStrip stripA, stripB;
+
+    juce::Label    presetLb;
+    juce::ComboBox presetBox;
+    juce::TextButton prevPreset { "<" }, nextPreset { ">" };
 
     juce::Label    modeLb, qualityLb;
     juce::ComboBox modeBox, qualityBox;
