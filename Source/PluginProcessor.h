@@ -85,6 +85,9 @@ private:
     // rate so automating Threshold / DC Threshold glides instead of zippering.
     juce::SmoothedValue<float> thresholdSm[2], biasSm[2], kneeSm[2];
 
+    // Link amount (0..1) consumed per OS sample in the CV loop.
+    juce::SmoothedValue<float> linkAmountSm;
+
     static int clampCh (int ch) noexcept { return ch < 0 ? 0 : (ch > 1 ? 1 : ch); }
 
     std::atomic<float> grMeterDb[2] { 0.0f, 0.0f };
@@ -109,6 +112,7 @@ private:
     std::atomic<float>* pOutput[2] {};
     std::atomic<float>* pCompIn[2] {};
     std::atomic<float>* pMode {};
+    std::atomic<float>* pLinkAmount {};
     std::atomic<float>* pQuality {};
     std::atomic<float>* pPurist {};
 

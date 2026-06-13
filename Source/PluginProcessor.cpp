@@ -38,9 +38,10 @@ TekkChild670Processor::TekkChild670Processor()
         pCompIn[ch]       = apvts.getRawParameterValue (pid::forChannel (pid::compIn, ch));
     }
 
-    pMode    = apvts.getRawParameterValue (pid::mode);
-    pQuality = apvts.getRawParameterValue (pid::quality);
-    pPurist  = apvts.getRawParameterValue (pid::purist);
+    pMode       = apvts.getRawParameterValue (pid::mode);
+    pLinkAmount = apvts.getRawParameterValue (pid::linkAmount);
+    pQuality    = apvts.getRawParameterValue (pid::quality);
+    pPurist     = apvts.getRawParameterValue (pid::purist);
 
     bypassParam = dynamic_cast<juce::AudioParameterBool*> (apvts.getParameter (pid::bypass));
     jassert (bypassParam != nullptr);
@@ -109,6 +110,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout TekkChild670Processor::creat
     layout.add (std::make_unique<j::AudioParameterChoice> (
         j::ParameterID (pid::mode, 1), "Channel Mode",
         juce::StringArray { "Left / Right", "Lat / Vert", "L/R Linked" }, 2));
+
+    layout.add (std::make_unique<j::AudioParameterFloat> (
+        j::ParameterID (pid::linkAmount, 1), "Link Amount",
+        j::NormalisableRange<float> (0.0f, 100.0f, 0.1f), 100.0f,
+        j::AudioParameterFloatAttributes().withLabel ("%")));
 
     layout.add (std::make_unique<j::AudioParameterChoice> (
         j::ParameterID (pid::quality, 1), "Engine",
@@ -185,7 +191,11 @@ void TekkChild670Processor::reset()
         biasSm[ch].setCurrentAndTargetValue (biasSm[ch].getTargetValue());
         kneeSm[ch].setCurrentAndTargetValue (kneeSm[ch].getTargetValue());
         grMeterDb[ch].store (0.0f);
+        inMeterDb[ch].store (-100.0f);
+        outMeterDb[ch].store (-100.0f);
     }
+
+    linkAmountSm.setCurrentAndTargetValue (linkAmountSm.getTargetValue());
 }
 
 bool TekkChild670Processor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -221,6 +231,9 @@ void TekkChild670Processor::applyQualityMode (int qualityIndex, bool reportLaten
         biasSm[ch].setCurrentAndTargetValue (p.biasDb);
         kneeSm[ch].setCurrentAndTargetValue (p.kneeDb);
     }
+
+    linkAmountSm.reset (effectiveFs, 0.02);
+    linkAmountSm.setCurrentAndTargetValue (purist ? 1.0f : pLinkAmount->load() * 0.01f);
 
     if (oversamplerIIR != nullptr) oversamplerIIR->reset();
     if (oversamplerFIR != nullptr) oversamplerFIR->reset();
@@ -338,6 +351,10 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
         mixSm[ch].setTargetValue (purist ? 1.0f : pMix[ch]->load() * 0.01f);
     }
 
+    // In purist mode the link is always hard (100%); otherwise the knob blends
+    // from each channel keeping its own CV (0%) toward the max-of-two (100%).
+    linkAmountSm.setTargetValue (purist ? 1.0f : pLinkAmount->load() * 0.01f);
+
     // keep the true dry signal for the blend control
     for (int ch = 0; ch < numCh; ++ch)
         dryBuffer.copyFrom (ch, 0, buffer, ch, 0, n);
@@ -383,9 +400,10 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
 
     for (int i = 0; i < osN; ++i)
     {
-        const float thr0  = thresholdSm[0].getNextValue();
-        const float bias0 = biasSm[0].getNextValue();
-        const float knee0 = kneeSm[0].getNextValue();
+        const float linkAmt = linkAmountSm.getNextValue();
+        const float thr0    = thresholdSm[0].getNextValue();
+        const float bias0   = biasSm[0].getNextValue();
+        const float knee0   = kneeSm[0].getNextValue();
         float cv0 = channels[0].computeControlVoltage (d0[i], thr0, bias0, knee0);
 
         if (d1 != nullptr)
@@ -396,7 +414,14 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
             float cv1 = channels[1].computeControlVoltage (d1[i], thr1, bias1, knee1);
 
             if (linked)
-                cv0 = cv1 = juce::jmax (cv0, cv1);
+            {
+                // Blend each channel's own CV toward the harder of the two.
+                // linkAmt = 1.0 is the classic hard stereo link;
+                // linkAmt = 0.0 lets each channel compress independently.
+                const float linkedCv = juce::jmax (cv0, cv1);
+                cv0 += linkAmt * (linkedCv - cv0);
+                cv1 += linkAmt * (linkedCv - cv1);
+            }
 
             d1[i]    = channels[1].renderWithControlVoltage (cv1);
             maxGr[1] = juce::jmax (maxGr[1], channels[1].currentGainReductionDb());

@@ -227,11 +227,12 @@ void GainReductionMeter::paint (juce::Graphics& g)
     g.setColour (juce::Colour (0xff3a1c08).withAlpha (0.85f));
     g.setFont (juce::Font (juce::FontOptions (10.0f)).boldened());
 
+    // Major ticks with labels
     for (float tick : { 0.0f, 5.0f, 10.0f, 15.0f, 20.0f })
     {
         const float a  = angleFor (tick);
         const auto p1  = pivot.getPointOnCircumference (needleLen, a);
-        const auto p2  = pivot.getPointOnCircumference (needleLen - 6.0f, a);
+        const auto p2  = pivot.getPointOnCircumference (needleLen - 7.0f, a);
         g.drawLine (juce::Line<float> (p1, p2), 1.4f);
 
         const auto tp = pivot.getPointOnCircumference (needleLen + 8.0f, a);
@@ -240,7 +241,28 @@ void GainReductionMeter::paint (juce::Graphics& g)
                     juce::Justification::centred);
     }
 
-    g.drawText ("GAIN REDUCTION  dB",
+    // Minor ticks (no labels, shorter)
+    g.setColour (juce::Colour (0xff3a1c08).withAlpha (0.55f));
+    for (float tick : { 2.0f, 4.0f, 6.0f, 8.0f, 12.0f, 14.0f, 16.0f, 18.0f })
+    {
+        const float a = angleFor (tick);
+        const auto p1 = pivot.getPointOnCircumference (needleLen, a);
+        const auto p2 = pivot.getPointOnCircumference (needleLen - 4.0f, a);
+        g.drawLine (juce::Line<float> (p1, p2), 1.0f);
+    }
+
+    // Numeric GR readout near the bottom of the face
+    g.setColour (juce::Colour (0xff3a1c08).withAlpha (0.85f));
+    g.setFont (juce::Font (juce::FontOptions (10.0f)).boldened());
+    const juce::String grText = needleDb < 0.05f
+        ? juce::String ("0.0 dB GR")
+        : juce::String (needleDb, 1) + " dB GR";
+    g.drawText (grText,
+                juce::Rectangle<float> (r.getWidth(), 11.0f)
+                    .withCentre ({ r.getCentreX(), r.getBottom() - 26.0f }),
+                juce::Justification::centred);
+
+    g.drawText ("GAIN REDUCTION",
                 juce::Rectangle<float> (r.getWidth(), 12.0f)
                     .withCentre ({ r.getCentreX(), r.getBottom() - 14.0f }),
                 juce::Justification::centred);
@@ -331,7 +353,11 @@ void LevelMeter::paint (juce::Graphics& g)
         g.fillRect (bx, top, bw, 10.0f); // bright lit tip
     }
 
-    // 0 dBFS reference and peak marker
+    // −18 dBFS nominal level reference (faint tick)
+    g.setColour (juce::Colours::white.withAlpha (0.14f));
+    g.drawHorizontalLine ((int) yFor (-18.0f), r.getX(), r.getRight());
+
+    // 0 dBFS reference
     g.setColour (juce::Colours::white.withAlpha (0.22f));
     g.drawHorizontalLine ((int) yFor (0.0f), r.getX(), r.getRight());
 
@@ -515,6 +541,19 @@ TekkChild670Editor::TekkChild670Editor (TekkChild670Processor& p)
         processor.apvts, tekk::pid::mode, modeBox);
     qualityAt = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
         processor.apvts, tekk::pid::quality, qualityBox);
+
+    linkAmtLb.setText ("LINK AMT", juce::dontSendNotification);
+    linkAmtLb.setFont (juce::Font (juce::FontOptions (12.0f)));
+    addAndMakeVisible (linkAmtLb);
+
+    linkAmtKnob.setSliderStyle (juce::Slider::LinearBar);
+    linkAmtKnob.setTextValueSuffix (" %");
+    linkAmtKnob.setColour (juce::Slider::trackColourId, tekk::colours::amber.withAlpha (0.6f));
+    linkAmtKnob.setColour (juce::Slider::textBoxTextColourId, tekk::colours::cream);
+    addAndMakeVisible (linkAmtKnob);
+
+    linkAmtAt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+        processor.apvts, tekk::pid::linkAmount, linkAmtKnob);
 
     addAndMakeVisible (puristBtn);
     addAndMakeVisible (bypassBtn);
@@ -716,4 +755,9 @@ void TekkChild670Editor::resized()
 
     bypassBtn.setBounds (footer.removeFromRight (92));
     puristBtn.setBounds (footer.removeFromRight (92));
+
+    // Link amount sits in the remaining centre space between engine box and buttons.
+    footer.removeFromLeft (18);
+    linkAmtLb.setBounds (footer.removeFromLeft (66));
+    linkAmtKnob.setBounds (footer.removeFromLeft (130).reduced (0, 4));
 }

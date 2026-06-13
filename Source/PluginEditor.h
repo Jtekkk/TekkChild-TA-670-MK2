@@ -121,11 +121,13 @@ private:
     juce::ComboBox presetBox;
     juce::TextButton prevPreset { "<" }, nextPreset { ">" };
 
-    juce::Label    modeLb, qualityLb;
+    juce::Label    modeLb, qualityLb, linkAmtLb;
     juce::ComboBox modeBox, qualityBox;
+    juce::Slider   linkAmtKnob;
     juce::ToggleButton puristBtn { "PURIST" }, bypassBtn { "BYPASS" };
 
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> modeAt, qualityAt;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   linkAmtAt;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>   puristAt, bypassAt;
 
     juce::Image chassis;  // cached hammered-metal background

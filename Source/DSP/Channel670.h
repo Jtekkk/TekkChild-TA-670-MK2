@@ -147,7 +147,7 @@ private:
 
     static float dbToLin (float db) noexcept
     {
-        return std::pow (10.0f, db * (1.0f / 20.0f));
+        return std::exp (db * 0.11512925464970228f); // ln(10)/20
     }
 
     // calibration of the variable-mu gain-reduction law

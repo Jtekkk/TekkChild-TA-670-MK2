@@ -82,6 +82,36 @@ inline const std::vector<Preset>& factoryPresets()
           { { pid::input, 3.0f }, { pid::threshold, 5.0f }, { pid::mix, 100.0f },
             { pid::output, -2.0f }, { pid::compIn, 0.0f } },
           { { pid::mode, 0.0f }, { pid::quality, 2.0f } } },
+
+        { "Acoustic Guitar",
+          { { pid::input, 1.0f }, { pid::threshold, 7.0f }, { pid::timeConstant, 2.0f },
+            { pid::scHpf, 1.0f }, { pid::mix, 90.0f }, { pid::output, 1.0f },
+            { pid::compIn, 1.0f } },
+          { { pid::mode, 0.0f }, { pid::quality, 1.0f } } },
+
+        { "Overhead Bus",
+          { { pid::threshold, 8.5f }, { pid::timeConstant, 4.0f },
+            { pid::scHpf, 2.0f }, { pid::mix, 100.0f }, { pid::output, 1.0f },
+            { pid::compIn, 1.0f } },
+          { { pid::mode, 2.0f }, { pid::linkAmount, 100.0f }, { pid::quality, 1.0f } } },
+
+        { "Dialogue",
+          { { pid::threshold, 7.0f }, { pid::timeConstant, 1.0f },
+            { pid::scHpf, 2.0f }, { pid::mix, 100.0f }, { pid::output, 1.0f },
+            { pid::compIn, 1.0f } },
+          { { pid::mode, 0.0f }, { pid::quality, 1.0f } } },
+
+        { "Room Mics",
+          { { pid::threshold, 8.0f }, { pid::timeConstant, 5.0f },
+            { pid::scHpf, 1.0f }, { pid::mix, 100.0f }, { pid::output, 2.0f },
+            { pid::compIn, 1.0f } },
+          { { pid::mode, 2.0f }, { pid::linkAmount, 100.0f }, { pid::quality, 2.0f } } },
+
+        { "Punch Bus",
+          { { pid::input, 2.0f }, { pid::threshold, 9.0f }, { pid::timeConstant, 0.0f },
+            { pid::scHpf, 1.0f }, { pid::mix, 40.0f }, { pid::output, 3.0f },
+            { pid::compIn, 1.0f } },
+          { { pid::mode, 2.0f }, { pid::linkAmount, 100.0f }, { pid::quality, 1.0f } } },
     };
 
     return presets;

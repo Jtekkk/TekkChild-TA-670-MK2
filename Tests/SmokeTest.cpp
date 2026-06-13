@@ -430,6 +430,57 @@ int main()
         setParam (proc, "bypass", 0.0f);
     }
 
+    // -- Stereo link amount --------------------------------------------------
+    {
+        setParam (proc, "mode", 2.0f);    // Linked
+        setParam (proc, "quality", 0.0f); // Eco
+
+        // Hard link (100%): both channels should see identical GR.
+        setParam (proc, "inputA",     6.0f);
+        setParam (proc, "inputB",     0.0f);  // channel B is quiet
+        setParam (proc, "thresholdA", 8.0f);
+        setParam (proc, "thresholdB", 8.0f);
+        setParam (proc, "linkamount", 100.0f);
+        runSine (proc, buffer, 0.5f, 1.0, 220.0, fs);
+        const float grHardA = proc.getGainReductionDb (0);
+        const float grHardB = proc.getGainReductionDb (1);
+
+        // Soft link (0%): channels are independent, B should show little GR.
+        setParam (proc, "linkamount", 0.0f);
+        proc.reset();
+        runSine (proc, buffer, 0.5f, 1.0, 220.0, fs);
+        const float grSoftA = proc.getGainReductionDb (0);
+        const float grSoftB = proc.getGainReductionDb (1);
+
+        expect (std::abs (grHardA - grHardB) < 1.0f,
+                "hard link (100%) makes both channels track the louder one");
+        expect (grSoftB < grSoftA * 0.5f,
+                "soft link (0%) lets the quiet channel compress independently");
+
+        setParam (proc, "linkamount", 100.0f);
+        setParam (proc, "inputA", 0.0f);
+        setParam (proc, "inputB", 0.0f);
+    }
+
+    // -- reset() clears level meters -----------------------------------------
+    {
+        setParam (proc, "mode", 0.0f);
+        setParam (proc, "quality", 0.0f);
+        setParam (proc, "compinA", 1.0f);
+        setParam (proc, "compinB", 1.0f);
+        runSine (proc, buffer, 0.5f, 0.1, 220.0, fs);
+
+        proc.reset();
+
+        const float inAfterReset  = proc.getInputLevelDb (0);
+        const float outAfterReset = proc.getOutputLevelDb (0);
+        const float grAfterReset  = proc.getGainReductionDb (0);
+
+        expect (inAfterReset  <= -99.0f, "reset() clears input meter");
+        expect (outAfterReset <= -99.0f, "reset() clears output meter");
+        expect (grAfterReset  == 0.0f,   "reset() clears GR meter");
+    }
+
     // -- State restoration of discrete parameters ----------------------------
     {
         // A bool/choice parameter keeps an un-snapped raw value; if a prior
