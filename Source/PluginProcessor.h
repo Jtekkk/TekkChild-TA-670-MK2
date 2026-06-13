@@ -1,0 +1,92 @@
+#pragma once
+
+#include <atomic>
+
+#include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_dsp/juce_dsp.h>
+
+#include "DSP/Channel670.h"
+
+class TekkChild670Processor : public juce::AudioProcessor
+{
+public:
+    TekkChild670Processor();
+
+    //==========================================================================
+    void prepareToPlay (double sampleRate, int samplesPerBlock) override;
+    void releaseResources() override;
+    bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
+    void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+
+    juce::AudioProcessorEditor* createEditor() override;
+    bool hasEditor() const override { return true; }
+
+    const juce::String getName() const override { return "TekkChild TA-670 MK2"; }
+
+    bool acceptsMidi() const override   { return false; }
+    bool producesMidi() const override  { return false; }
+    bool isMidiEffect() const override  { return false; }
+    double getTailLengthSeconds() const override { return 0.0; }
+
+    int getNumPrograms() override                          { return 1; }
+    int getCurrentProgram() override                       { return 0; }
+    void setCurrentProgram (int) override                  {}
+    const juce::String getProgramName (int) override       { return "Default"; }
+    void changeProgramName (int, const juce::String&) override {}
+
+    void getStateInformation (juce::MemoryBlock& destData) override;
+    void setStateInformation (const void* data, int sizeInBytes) override;
+
+    juce::AudioProcessorParameter* getBypassParameter() const override { return bypassParam; }
+
+    //==========================================================================
+    // Smoothed, per-block maximum gain reduction for the editor's VU needles.
+    float getGainReductionDb (int channel) const noexcept
+    {
+        return grMeterDb[channel < 0 ? 0 : (channel > 1 ? 1 : channel)].load();
+    }
+
+    juce::AudioProcessorValueTreeState apvts;
+
+private:
+    static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+
+    void applyQualityMode (int qualityIndex);
+    tekk::ChannelParams paramsForChannel (int channel, bool purist) const;
+
+    //==========================================================================
+    tekk::Channel670 channels[2];
+
+    // 4x oversamplers: minimum-phase IIR for the zero-latency mode,
+    // linear-phase FIR for the studio mode
+    std::unique_ptr<juce::dsp::Oversampling<float>> oversamplerIIR, oversamplerFIR;
+
+    juce::AudioBuffer<float> dryBuffer;
+    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::None> dryDelay;
+
+    juce::SmoothedValue<float> inputGainSm[2], outputGainSm[2], mixSm[2];
+
+    std::atomic<float> grMeterDb[2] { 0.0f, 0.0f };
+
+    double baseSampleRate = 44100.0;
+    int    maxBlockSize   = 512;
+    int    activeQuality  = -1;
+    int    latencySamples = 0;
+
+    // cached raw parameter values
+    std::atomic<float>* pInput[2] {};
+    std::atomic<float>* pThreshold[2] {};
+    std::atomic<float>* pTimeConstant[2] {};
+    std::atomic<float>* pDcThreshold[2] {};
+    std::atomic<float>* pScHpf[2] {};
+    std::atomic<float>* pMix[2] {};
+    std::atomic<float>* pOutput[2] {};
+    std::atomic<float>* pCompIn[2] {};
+    std::atomic<float>* pMode {};
+    std::atomic<float>* pQuality {};
+    std::atomic<float>* pPurist {};
+
+    juce::AudioParameterBool* bypassParam = nullptr;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TekkChild670Processor)
+};

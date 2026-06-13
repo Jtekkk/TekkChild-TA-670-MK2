@@ -1,0 +1,16 @@
+# build trees
+build/
+build-*/
+cmake-build-*/
+out/
+
+# IDE / tooling
+.cache/
+.vscode/
+.idea/
+*.user
+compile_commands.json
+
+# OS noise
+.DS_Store
+Thumbs.db
