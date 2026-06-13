@@ -15,6 +15,9 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(JUCE)
 
+# Embedded artwork (the central faceplate graphic)
+juce_add_binary_data(TekkChildArt SOURCES Resources/tekkchild_face.png)
+
 set(TEKK_FORMATS VST3 Standalone)
 if(APPLE)
     list(APPEND TEKK_FORMATS AU)
@@ -52,6 +55,7 @@ target_compile_definitions(TekkChild670 PUBLIC
 
 target_link_libraries(TekkChild670
     PRIVATE
+        TekkChildArt
         juce::juce_audio_utils
         juce::juce_dsp
     PUBLIC
@@ -79,6 +83,7 @@ target_compile_definitions(TekkChild670Tests PRIVATE
 
 target_link_libraries(TekkChild670Tests
     PRIVATE
+        TekkChildArt
         juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_recommended_config_flags
@@ -102,6 +107,7 @@ target_compile_definitions(TekkChild670Measure PRIVATE
 
 target_link_libraries(TekkChild670Measure
     PRIVATE
+        TekkChildArt
         juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_recommended_config_flags

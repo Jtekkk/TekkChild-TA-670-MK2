@@ -1,5 +1,7 @@
 #include "PluginEditor.h"
 
+#include <BinaryData.h>
+
 #include "Parameters.h"
 
 namespace tekk
@@ -543,6 +545,9 @@ TekkChild670Editor::TekkChild670Editor (TekkChild670Processor& p)
     addAndMakeVisible (prevPreset);
     addAndMakeVisible (nextPreset);
 
+    faceArt = juce::ImageCache::getFromMemory (BinaryData::tekkchild_face_png,
+                                               BinaryData::tekkchild_face_pngSize);
+
     refreshPresetBox();
     startTimerHz (8); // keep the box in step with host-driven program changes
 
@@ -615,6 +620,69 @@ void TekkChild670Editor::paint (juce::Graphics& g)
                     juce::Point<float> (18.0f, (float) getHeight() - 18.0f),
                     juce::Point<float> ((float) getWidth() - 18.0f, (float) getHeight() - 18.0f) })
         tekk::drawScrew (g, p.x, p.y, 6.0f, 30.0f * (p.x + p.y));
+
+    // central faceplate graphic, mounted between the two channel sections
+    if (! faceArea.isEmpty())
+    {
+        auto fa = faceArea.toFloat();
+
+        // raised metal frame plate
+        g.setColour (juce::Colours::black.withAlpha (0.4f));
+        g.fillRoundedRectangle (fa.translated (0.0f, 2.0f), 9.0f);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff3e4046), fa.getCentreX(), fa.getY(),
+                                                 juce::Colour (0xff26272b), fa.getCentreX(), fa.getBottom(), false));
+        g.fillRoundedRectangle (fa, 9.0f);
+        g.setColour (juce::Colours::white.withAlpha (0.10f));
+        g.drawLine (fa.getX() + 8.0f, fa.getY() + 1.0f, fa.getRight() - 8.0f, fa.getY() + 1.0f, 1.2f);
+        g.setColour (juce::Colour (0xff141416));
+        g.drawRoundedRectangle (fa, 9.0f, 1.4f);
+
+        auto win   = fa.reduced (10.0f);
+        auto label = win.removeFromBottom (22.0f); // engraved nameplate strip
+        win.removeFromBottom (4.0f);
+
+        tekk::drawRecess (g, win, 6.0f);
+
+        // warm backlight behind the art
+        g.setGradientFill (juce::ColourGradient (tekk::colours::glow.withAlpha (0.35f),
+                                                 win.getCentreX(), win.getCentreY(),
+                                                 juce::Colours::transparentBlack, win.getCentreX(), win.getY(), true));
+        g.fillRoundedRectangle (win, 6.0f);
+
+        if (faceArt.isValid())
+        {
+            juce::Graphics::ScopedSaveState ss (g);
+            juce::Path clip;
+            clip.addRoundedRectangle (win.reduced (2.0f), 5.0f);
+            g.reduceClipRegion (clip);
+
+            const auto iw = win.reduced (2.0f).toNearestInt();
+            g.drawImageWithin (faceArt, iw.getX(), iw.getY(), iw.getWidth(), iw.getHeight(),
+                               juce::RectanglePlacement::fillDestination);
+        }
+
+        // glass sheen across the top
+        g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.16f), win.getX(), win.getY(),
+                                                 juce::Colours::transparentBlack, win.getX(), win.getCentreY(), false));
+        g.fillRoundedRectangle (win.withTrimmedBottom (win.getHeight() * 0.62f), 6.0f);
+
+        g.setColour (juce::Colour (0xff141416));
+        g.drawRoundedRectangle (win, 6.0f, 1.2f);
+
+        // engraved nameplate
+        g.setFont (juce::Font (juce::FontOptions (13.0f)).boldened());
+        g.setColour (juce::Colours::black.withAlpha (0.6f));
+        g.drawText ("TEKKCHILD", label.translated (0.0f, 1.0f), juce::Justification::centred);
+        g.setColour (tekk::colours::amber);
+        g.drawText ("TEKKCHILD", label, juce::Justification::centred);
+
+        // corner screws on the plate
+        const float ins = 12.0f;
+        tekk::drawScrew (g, fa.getX() + ins,     fa.getY() + ins,      4.5f, 20.0f);
+        tekk::drawScrew (g, fa.getRight() - ins, fa.getY() + ins,      4.5f, -35.0f);
+        tekk::drawScrew (g, fa.getX() + ins,     fa.getBottom() - ins, 4.5f, 55.0f);
+        tekk::drawScrew (g, fa.getRight() - ins, fa.getBottom() - ins, 4.5f, 5.0f);
+    }
 }
 
 void TekkChild670Editor::resized()
@@ -634,8 +702,10 @@ void TekkChild670Editor::resized()
     auto footer = r.removeFromBottom (52).reduced (14, 10);
 
     auto body = r.reduced (12, 6);
-    const int half = body.getWidth() / 2;
-    stripA.setBounds (body.removeFromLeft (half).reduced (4, 0));
+    const int colW  = 176;
+    const int sideW = (body.getWidth() - colW) / 2;
+    stripA.setBounds (body.removeFromLeft (sideW).reduced (4, 0));
+    faceArea = body.removeFromLeft (colW).reduced (6, 2);
     stripB.setBounds (body.reduced (4, 0));
 
     modeLb.setBounds (footer.removeFromLeft (44));
