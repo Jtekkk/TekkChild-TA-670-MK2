@@ -30,17 +30,30 @@ public:
     {
         for (auto& s : state)
             s = 0.0f;
+
+        lastCv = 0.0f;
     }
 
     void setPosition (int newPosition) // 0..5
     {
         newPosition = newPosition < 0 ? 0 : (newPosition > 5 ? 5 : newPosition);
 
-        if (newPosition != position)
-        {
-            position = newPosition;
-            updateCoefficients();
-        }
+        if (newPosition == position)
+            return;
+
+        // Switching the TIME CONSTANT selector swaps the RC network on a live
+        // control line; the variable-mu stage must not hear a step. The branch
+        // weights sum to 1 at every position, so seeding each active branch to
+        // the control voltage held at the switch instant makes the summed CV
+        // continuous. Each branch then evolves with its own time constant.
+        const float held = lastCv;
+
+        position = newPosition;
+        updateCoefficients();
+
+        const auto& tc = kTimeConstants[position];
+        for (int i = 0; i < tc.numBranches; ++i)
+            state[i] = held;
     }
 
     float process (float rectifiedDrive) noexcept
@@ -55,6 +68,7 @@ public:
             cv += tc.branch[i].weight * state[i];
         }
 
+        lastCv = cv;
         return cv;
     }
 
@@ -89,6 +103,7 @@ private:
     float state[3] {};
     float attackCoeff[3] {};
     float releaseCoeff[3] {};
+    float lastCv = 0.0f;
 };
 
 } // namespace tekk

@@ -156,7 +156,7 @@ void TekkChild670Processor::prepareToPlay (double sampleRate, int samplesPerBloc
     }
 
     activeQuality = -1;
-    applyQualityMode ((int) pQuality->load());
+    applyQualityMode ((int) pQuality->load(), true);
 }
 
 void TekkChild670Processor::releaseResources()
@@ -172,7 +172,7 @@ bool TekkChild670Processor::isBusesLayoutSupported (const BusesLayout& layouts) 
         && (in == juce::AudioChannelSet::mono() || in == juce::AudioChannelSet::stereo());
 }
 
-void TekkChild670Processor::applyQualityMode (int qualityIndex)
+void TekkChild670Processor::applyQualityMode (int qualityIndex, bool reportLatencyNow)
 {
     activeQuality = qualityIndex;
 
@@ -184,6 +184,19 @@ void TekkChild670Processor::applyQualityMode (int qualityIndex)
     for (auto& ch : channels)
         ch.prepare (effectiveFs);
 
+    // the detector smoothers are consumed in the (oversampled) per-sample loop
+    const bool purist = pPurist->load() > 0.5f;
+    for (int ch = 0; ch < 2; ++ch)
+    {
+        const auto p = paramsForChannel (ch, purist);
+        thresholdSm[ch].reset (effectiveFs, 0.01);
+        biasSm[ch].reset (effectiveFs, 0.01);
+        kneeSm[ch].reset (effectiveFs, 0.01);
+        thresholdSm[ch].setCurrentAndTargetValue (p.thresholdDb);
+        biasSm[ch].setCurrentAndTargetValue (p.biasDb);
+        kneeSm[ch].setCurrentAndTargetValue (p.kneeDb);
+    }
+
     if (oversamplerIIR != nullptr) oversamplerIIR->reset();
     if (oversamplerFIR != nullptr) oversamplerFIR->reset();
 
@@ -193,7 +206,23 @@ void TekkChild670Processor::applyQualityMode (int qualityIndex)
 
     dryDelay.reset();
     dryDelay.setDelay ((float) latencySamples);
-    setLatencySamples (latencySamples);
+
+    // setLatencySamples can call back into the host, so only invoke it directly
+    // from prepareToPlay; from the audio thread defer it to the message thread.
+    if (reportLatencyNow)
+    {
+        setLatencySamples (latencySamples);
+    }
+    else
+    {
+        pendingLatency.store (latencySamples);
+        triggerAsyncUpdate();
+    }
+}
+
+void TekkChild670Processor::handleAsyncUpdate()
+{
+    setLatencySamples (pendingLatency.load());
 }
 
 tekk::ChannelParams TekkChild670Processor::paramsForChannel (int ch, bool purist) const
@@ -232,7 +261,24 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
 
     if (bypassParam->get())
     {
-        // true bypass: the buffer passes completely untouched
+        // True bypass passes the signal unprocessed, but the host's bypass must
+        // stay aligned with the latency we report -- so in an oversampled engine
+        // the dry signal is delayed to match. In a zero-latency engine this is
+        // a bit-exact passthrough.
+        if (latencySamples > 0)
+        {
+            for (int ch = 0; ch < numCh; ++ch)
+            {
+                auto* x = buffer.getWritePointer (ch);
+
+                for (int i = 0; i < n; ++i)
+                {
+                    dryDelay.pushSample (ch, x[i]);
+                    x[i] = dryDelay.popSample (ch);
+                }
+            }
+        }
+
         grMeterDb[0].store (0.0f);
         grMeterDb[1].store (0.0f);
         return;
@@ -240,7 +286,7 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
 
     const int quality = juce::jlimit (0, 2, (int) pQuality->load());
     if (quality != activeQuality)
-        applyQualityMode (quality);
+        applyQualityMode (quality, false);
 
     const bool purist = pPurist->load() > 0.5f;
     const int  mode   = juce::jlimit (0, 2, (int) pMode->load());
@@ -249,7 +295,13 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
 
     for (int ch = 0; ch < numCh; ++ch)
     {
-        channels[ch].setParams (paramsForChannel (ch, purist));
+        const auto cp = paramsForChannel (ch, purist);
+        channels[ch].setParams (cp);
+
+        thresholdSm[ch].setTargetValue (cp.thresholdDb);
+        biasSm[ch].setTargetValue (cp.biasDb);
+        kneeSm[ch].setTargetValue (cp.kneeDb);
+
         inputGainSm[ch].setTargetValue (juce::Decibels::decibelsToGain (pInput[ch]->load()));
         outputGainSm[ch].setTargetValue (juce::Decibels::decibelsToGain (pOutput[ch]->load()));
         mixSm[ch].setTargetValue (purist ? 1.0f : pMix[ch]->load() * 0.01f);
@@ -294,11 +346,17 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
 
     for (int i = 0; i < osN; ++i)
     {
-        float cv0 = channels[0].computeControlVoltage (d0[i]);
+        const float thr0  = thresholdSm[0].getNextValue();
+        const float bias0 = biasSm[0].getNextValue();
+        const float knee0 = kneeSm[0].getNextValue();
+        float cv0 = channels[0].computeControlVoltage (d0[i], thr0, bias0, knee0);
 
         if (d1 != nullptr)
         {
-            float cv1 = channels[1].computeControlVoltage (d1[i]);
+            const float thr1  = thresholdSm[1].getNextValue();
+            const float bias1 = biasSm[1].getNextValue();
+            const float knee1 = kneeSm[1].getNextValue();
+            float cv1 = channels[1].computeControlVoltage (d1[i], thr1, bias1, knee1);
 
             if (linked)
                 cv0 = cv1 = juce::jmax (cv0, cv1);

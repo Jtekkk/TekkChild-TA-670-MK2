@@ -73,6 +73,8 @@ target_include_directories(TekkChild670Tests PRIVATE Source)
 target_compile_definitions(TekkChild670Tests PRIVATE
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
+    # the test harness pumps the message loop to flush deferred latency updates
+    JUCE_MODAL_LOOPS_PERMITTED=1
 )
 
 target_link_libraries(TekkChild670Tests

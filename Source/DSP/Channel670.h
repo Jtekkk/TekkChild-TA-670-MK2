@@ -47,6 +47,8 @@ class Channel670
 public:
     void prepare (double sampleRate)
     {
+        fs = sampleRate;
+
         cvNetwork.prepare (sampleRate);
         inputTransformer.prepare (sampleRate);
         outputTransformer.prepare (sampleRate);
@@ -56,6 +58,10 @@ public:
         inputTransformer.setDrive (0.45f);  // UTC A26: line level, modest flux
         outputTransformer.setDrive (0.9f);  // Sowter: driven by the power stage
         tube.setDrive (0.7f);
+
+        // ~15 ms linear ramp when AGC In is toggled, so the gain reduction
+        // fades in/out instead of switching as a step
+        engageInc = (float) (1.0 / (0.015 * fs));
 
         reset();
     }
@@ -70,6 +76,7 @@ public:
         feedbackSample = 0.0f;
         conditioned    = 0.0f;
         lastGrDb       = 0.0f;
+        engage         = engageTarget;
     }
 
     void setParams (const ChannelParams& p)
@@ -79,17 +86,21 @@ public:
         scFilter.enabled = p.scHpfHz > 0.0f;
         if (scFilter.enabled)
             scFilter.setCutoff (p.scHpfHz);
+
+        engageTarget = p.compIn ? 1.0f : 0.0f;
     }
 
     // Phase 1: condition the input and report this channel's control voltage.
-    float computeControlVoltage (float input) noexcept
+    // Detector threshold / bias / knee arrive already smoothed, so automating
+    // them glides the reference rather than stepping it once per block.
+    float computeControlVoltage (float input, float thresholdDb, float biasDb,
+                                 float kneeDb) noexcept
     {
         conditioned = inputTransformer.process (input);
 
         const float sc      = scFilter.process (feedbackSample);
         const float levelDb = 20.0f * std::log10 (std::abs (sc) + 1.0e-9f);
-        const float overDb  = softOvershoot (levelDb - params.thresholdDb - params.biasDb,
-                                             params.kneeDb);
+        const float overDb  = softOvershoot (levelDb - thresholdDb - biasDb, kneeDb);
 
         return cvNetwork.process (overDb * (1.0f / 24.0f)); // 24 dB over -> CV 1.0
     }
@@ -97,14 +108,16 @@ public:
     // Phase 2: apply the (possibly link-combined) control voltage.
     float renderWithControlVoltage (float cv) noexcept
     {
+        engage += std::clamp (engageTarget - engage, -engageInc, engageInc);
+
         // Variable-mu law: the CV drives the remote-cutoff grids towards
         // cutoff, so transconductance -- and with it the ratio -- falls
-        // progressively rather than at a fixed slope.
-        const float grDb = std::min (kMaxGainReductionDb, kCvToDb * cv * (1.0f + cv));
-        lastGrDb = params.compIn ? grDb : 0.0f;
+        // progressively rather than at a fixed slope. The engage factor only
+        // moves while AGC In is being toggled, so it never blunts the attack.
+        const float grDb = engage * std::min (kMaxGainReductionDb, kCvToDb * cv * (1.0f + cv));
+        lastGrDb = grDb;
 
-        const float gain       = params.compIn ? dbToLin (-grDb) : 1.0f;
-        const float compressed = tube.process (gain * conditioned);
+        const float compressed = tube.process (dbToLin (-grDb) * conditioned);
 
         feedbackSample = compressed;
         return outputTransformer.process (compressed);
@@ -142,9 +155,14 @@ private:
     TubeStage             tube;
     SidechainFilter       scFilter;
 
+    double fs            = 44100.0;
     float feedbackSample = 0.0f;
     float conditioned    = 0.0f;
     float lastGrDb       = 0.0f;
+
+    float engage       = 1.0f; // current AGC-in factor (0..1)
+    float engageTarget = 1.0f;
+    float engageInc    = 1.0f;
 };
 
 } // namespace tekk

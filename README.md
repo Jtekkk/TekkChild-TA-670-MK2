@@ -134,9 +134,29 @@ Source/
     TransformerModel.h      LF-weighted core saturation, band edges
     SidechainFilter.h       TPT high-pass on the detector
 Tests/
-  SmokeTest.cpp             engine contract tests, run in CI on all platforms
-.github/workflows/build.yml CI: Linux/macOS/Windows build + tests + VST3 artifacts
+  SmokeTest.cpp             engine + anti-click contract tests, run in CI
+.github/workflows/build.yml CI: Linux/macOS/Windows build + tests + pluginval + artifacts
 ```
+
+## Validation & robustness
+
+The plugin passes [pluginval](https://github.com/Tracktion/pluginval) at
+strictness level 10 (real-time safety, parameter and state threading, bus
+layouts, automation and parameter fuzzing), and CI runs it on every push.
+
+Hardening that the headless tests lock in:
+
+- **Click-free automation.** Threshold and DC Threshold are smoothed at the
+  detector rate, so automating them glides instead of stepping per block.
+- **Click-free switching.** Flipping the Time Constant selector seeds the
+  capacitor branches to the held control voltage (the branch weights sum to 1
+  at every position), so the gain reduction is continuous across the switch.
+  Toggling AGC In ramps over ~15 ms rather than stepping.
+- **Latency-aligned true bypass.** Bypass passes the signal unprocessed but
+  delayed to match the engine's reported latency, so a host's delay
+  compensation stays aligned (bit-exact in the zero-latency engine).
+- **No host calls on the audio thread.** Engine-mode latency changes are
+  reported from the message thread via an async update.
 
 ## Engineering status
 

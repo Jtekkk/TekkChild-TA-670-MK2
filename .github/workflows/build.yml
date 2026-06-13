@@ -39,6 +39,20 @@ jobs:
         if: runner.os == 'Windows'
         run: ./build/TekkChild670Tests_artefacts/Release/TekkChild670Tests.exe
 
+      # Host-level validation: RT-safety, parameter/state threading, bus
+      # layouts, automation and fuzzing. Run on Linux under a virtual display.
+      - name: Validate with pluginval
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y xvfb
+          curl -sL -o pluginval.zip \
+            https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Linux.zip
+          unzip -o pluginval.zip -d pluginval-bin
+          chmod +x pluginval-bin/pluginval
+          xvfb-run -a -s "-screen 0 1280x1024x24" pluginval-bin/pluginval \
+            --strictness-level 10 --validate \
+            "build/TekkChild670_artefacts/Release/VST3/TekkChild TA-670 MK2.vst3"
+
       - name: Upload VST3
         uses: actions/upload-artifact@v4
         with:

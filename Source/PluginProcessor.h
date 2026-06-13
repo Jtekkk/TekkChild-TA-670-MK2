@@ -7,7 +7,8 @@
 
 #include "DSP/Channel670.h"
 
-class TekkChild670Processor : public juce::AudioProcessor
+class TekkChild670Processor : public juce::AudioProcessor,
+                              private juce::AsyncUpdater
 {
 public:
     TekkChild670Processor();
@@ -51,7 +52,10 @@ public:
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
-    void applyQualityMode (int qualityIndex);
+    // reportLatencyNow is true only when called from prepareToPlay (message
+    // thread); from the audio thread we defer setLatencySamples to handleAsyncUpdate.
+    void applyQualityMode (int qualityIndex, bool reportLatencyNow);
+    void handleAsyncUpdate() override;
     tekk::ChannelParams paramsForChannel (int channel, bool purist) const;
 
     //==========================================================================
@@ -66,12 +70,17 @@ private:
 
     juce::SmoothedValue<float> inputGainSm[2], outputGainSm[2], mixSm[2];
 
+    // Detector controls are smoothed at the (possibly oversampled) detector
+    // rate so automating Threshold / DC Threshold glides instead of zippering.
+    juce::SmoothedValue<float> thresholdSm[2], biasSm[2], kneeSm[2];
+
     std::atomic<float> grMeterDb[2] { 0.0f, 0.0f };
 
     double baseSampleRate = 44100.0;
     int    maxBlockSize   = 512;
     int    activeQuality  = -1;
     int    latencySamples = 0;
+    std::atomic<int> pendingLatency { 0 };
 
     // cached raw parameter values
     std::atomic<float>* pInput[2] {};
