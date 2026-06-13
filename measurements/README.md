@@ -26,18 +26,24 @@ analysis / comparison against hardware captures).
 ## Current model — headline numbers
 
 - **Compression curve.** Below threshold the curve tracks unity; the knee is
-  soft and the ratio increases progressively with level (≈16 dB of gain
-  reduction by +6 dBFS at THRESHOLD 5), as expected from a feedback variable-mu
-  topology.
-- **Harmonic profile.** THD rises smoothly with level (≈0.03% at −36 dBFS to
-  ≈11% at +6 dBFS at 1 kHz). The distortion is **low-frequency weighted**:
-  ≈2.6% at 20–30 Hz versus ≈1.3% above ~200 Hz at −6 dBFS, because the
-  transformer core saturates the low band first.
-- **Frequency response.** Flat across the audio band with a gentle ~6 Hz
-  high-pass roll-off (transformer open-circuit inductance / DC blocking);
-  −3 dB near 13 Hz, essentially flat from 50 Hz to Nyquist.
+  soft and the ratio increases progressively with level rather than holding a
+  fixed slope (≈13 dB of gain reduction by +6 dBFS at THRESHOLD 5, more at
+  higher settings as the loop approaches its ~22 dB ceiling), as expected from
+  a feedback variable-mu topology that limits rather than clips.
+- **Harmonic profile.** THD is low at nominal and rises smoothly when the unit
+  is pushed (≈0.1% at −20 dBFS, ≈0.3–1% around nominal, ≈3.7% at 0 dBFS, ≈11%
+  by +6 dBFS at 1 kHz). The distortion is **low-frequency weighted** — ≈4% at
+  20 Hz versus ≈1% at 1 kHz at −6 dBFS — because the transformer core saturates
+  the low band first. With the compressor in circuit it thickens further as
+  gain reduction increases, since the tube is biased harder toward cutoff.
+- **Frequency response.** Essentially flat across the audio band with gentle
+  roll-offs at both extremes: a ~6 Hz high-pass at the bottom (transformer
+  open-circuit inductance / DC blocking; −3 dB near 13 Hz) and a soft top-end
+  roll-off from the output-transformer bandwidth (≈−2 dB at 20 kHz).
 
-> These are the model as it stands. The per-stage drive levels and the
-> CV-to-gain-reduction law in `Source/DSP/` are the calibration points: when
-> reference-hardware curves are available, tune those constants and re-run the
-> harness to compare.
+> These are best-estimate characterisations of the model, grounded in the
+> documented operation of a Fairchild 670 (variable-mu feedback gain control,
+> LF-weighted iron saturation, program-dependent time constants) rather than a
+> bench capture of a specific unit. The per-stage drive levels and the
+> gain-reduction law in `Source/DSP/` remain the calibration points should
+> reference-hardware curves become available.

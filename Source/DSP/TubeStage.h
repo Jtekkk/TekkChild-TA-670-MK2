@@ -7,14 +7,18 @@ namespace tekk
 {
 
 /*
-    Static nonlinearity for the push-pull tube stages.
+    Static nonlinearity for the push-pull variable-mu (6386) gain stage.
 
-    A matched push-pull pair cancels even harmonics, so the curve is
-    dominated by smooth odd-order saturation (the tanh law of the
-    differential pair). A small signal-dependent asymmetry models the
-    real-world mismatch between the two halves and contributes the
-    low-level 2nd harmonic measured on hardware units. The asymmetry
-    rectifies slightly, so a DC blocker follows the shaper.
+    A matched push-pull pair cancels even harmonics, so the tube contribution
+    is dominated by smooth odd-order (3rd) saturation -- the tanh law of the
+    differential pair -- with only a small even (2nd) term from the unavoidable
+    mismatch between the two halves. Because tanh(d*x)/d -> x for small x, the
+    small-signal gain is ~unity regardless of drive: 'drive' sets how much
+    harmonic content a given level produces, not the level itself.
+
+    True to operation, the curvature is pushed harder as the stage is driven
+    toward cutoff (more gain reduction), so the unit thickens as it works --
+    the per-sample driveMul carries that from the control loop.
 */
 class TubeStage
 {
@@ -31,19 +35,21 @@ public:
     // 1.0 = nominal operating level; higher values bias the stage hotter
     void setDrive (float newDrive) noexcept { drive = std::max (0.1f, newDrive); }
 
-    float process (float x) noexcept
+    float process (float x, float driveMul = 1.0f) noexcept
     {
+        const float d = drive * driveMul;
+
         // the shaper is only meaningful within the tubes' swing; clamping
         // here also keeps the asymmetry term monotonic
-        const float xd = std::clamp (drive * x, -4.0f, 4.0f);
-        const float shaped = std::tanh (xd + kAsymmetry * xd * xd) / drive;
+        const float xd = std::clamp (d * x, -4.0f, 4.0f);
+        const float shaped = std::tanh (xd + kAsymmetry * xd * xd) / d;
 
         dcState += dcCoeff * (shaped - dcState);
         return shaped - dcState;
     }
 
 private:
-    static constexpr float kAsymmetry = 0.05f;
+    static constexpr float kAsymmetry = 0.035f; // small: push-pull cancels most even order
 
     float drive = 1.0f;
     float dcCoeff = 0.0f;

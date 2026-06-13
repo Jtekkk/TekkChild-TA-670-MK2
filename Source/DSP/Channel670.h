@@ -55,8 +55,10 @@ public:
         tube.prepare (sampleRate);
         scFilter.prepare (sampleRate);
 
-        inputTransformer.setDrive (0.45f);  // UTC A26: line level, modest flux
-        outputTransformer.setDrive (0.9f);  // Sowter: driven by the power stage
+        inputTransformer.setDrive (0.45f);   // UTC A26: line level, modest flux
+        outputTransformer.setDrive (0.8f);   // Sowter: driven by the power stage
+        inputTransformer.setHfRolloff (60000.0f);  // essentially flat in band
+        outputTransformer.setHfRolloff (30000.0f); // output iron sets the bandwidth
         tube.setDrive (0.7f);
 
         // ~15 ms linear ramp when AGC In is toggled, so the gain reduction
@@ -102,22 +104,27 @@ public:
         const float levelDb = 20.0f * std::log10 (std::abs (sc) + 1.0e-9f);
         const float overDb  = softOvershoot (levelDb - thresholdDb - biasDb, kneeDb);
 
-        return cvNetwork.process (overDb * (1.0f / 24.0f)); // 24 dB over -> CV 1.0
+        return cvNetwork.process (overDb); // smoothed dB over threshold
     }
 
-    // Phase 2: apply the (possibly link-combined) control voltage.
+    // Phase 2: apply the (possibly link-combined) control voltage (dB over thr).
     float renderWithControlVoltage (float cv) noexcept
     {
         engage += std::clamp (engageTarget - engage, -engageInc, engageInc);
 
-        // Variable-mu law: the CV drives the remote-cutoff grids towards
-        // cutoff, so transconductance -- and with it the ratio -- falls
-        // progressively rather than at a fixed slope. The engage factor only
-        // moves while AGC In is being toggled, so it never blunts the attack.
-        const float grDb = engage * std::min (kMaxGainReductionDb, kCvToDb * cv * (1.0f + cv));
+        // Variable-mu law: as the rectified control voltage pulls the remote-
+        // cutoff grids toward cutoff, transconductance falls and gain reduction
+        // builds progressively, saturating toward a ceiling rather than holding
+        // a fixed ratio -- a few dB come easily, the last few dB are hard, which
+        // is what makes the 670 behave gently then limit.
+        const float grDb = engage * kMaxGainReductionDb
+                         * (1.0f - std::exp (-cv * kGrSlope));
         lastGrDb = grDb;
 
-        const float compressed = tube.process (dbToLin (-grDb) * conditioned);
+        // true to operation, the tube distorts more the harder it is biased
+        // toward cutoff, so the unit thickens as it compresses
+        const float driveMul   = 1.0f + kTubeGrDrive * (grDb * (1.0f / kMaxGainReductionDb));
+        const float compressed = tube.process (dbToLin (-grDb) * conditioned, driveMul);
 
         feedbackSample = compressed;
         return outputTransformer.process (compressed);
@@ -143,9 +150,10 @@ private:
         return std::pow (10.0f, db * (1.0f / 20.0f));
     }
 
-    // calibration of the CV-to-gain-reduction law
-    static constexpr float kCvToDb              = 36.0f;
-    static constexpr float kMaxGainReductionDb  = 30.0f;
+    // calibration of the variable-mu gain-reduction law
+    static constexpr float kMaxGainReductionDb = 22.0f; // ceiling the loop approaches
+    static constexpr float kGrSlope            = 1.0f / 13.0f; // GR build per dB over threshold
+    static constexpr float kTubeGrDrive        = 1.2f;  // extra tube curvature at full GR
 
     ChannelParams params;
 

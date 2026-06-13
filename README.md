@@ -185,9 +185,10 @@ cmake --build build --target TekkChild670Measure
 ```
 
 See [`measurements/`](measurements/) for the plots and the current model's
-headline numbers. These curves are the data you calibrate the DSP constants
-against; today they confirm the intended behaviour (soft-knee progressive
-ratio, low-frequency-weighted harmonics, flat response with a ~6 Hz roll-off).
+headline numbers. The model is a best estimate grounded in the documented
+operation of a 670 (variable-mu feedback gain control, LF-weighted iron
+saturation, distortion that rises with gain reduction, program-dependent time
+constants, gentle band edges) — see the measurement notes for specifics.
 
 ## Engineering status
 
