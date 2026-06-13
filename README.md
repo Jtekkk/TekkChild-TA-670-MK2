@@ -1,4 +1,4 @@
-# TekkChild TA-670 MK2
+# Tekk.Engineering.Audio.Labs TEAL - TekkChild TC-670 Vari-Mu Compressor
 
 The TekkChild TA-670 MK2 is our revolutionary VST plugin that brings the most
 iconic and finest sounding tube compressor in history to your DAW.
