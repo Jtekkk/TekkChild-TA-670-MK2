@@ -430,6 +430,33 @@ int main()
         setParam (proc, "bypass", 0.0f);
     }
 
+    // -- State restoration of discrete parameters ----------------------------
+    {
+        // A bool/choice parameter keeps an un-snapped raw value; if a prior
+        // value snapped to the same bin as the restored one, a naive
+        // replaceState leaves it stale. This reproduces that pluginval failure.
+        auto* comp   = proc.apvts.getParameter ("compinA");
+        auto* purist = proc.apvts.getParameter ("purist");
+
+        comp->setValueNotifyingHost (1.0f);   // AGC In A = true
+        purist->setValueNotifyingHost (0.0f); // Purist  = false
+
+        juce::MemoryBlock state;
+        proc.getStateInformation (state);
+
+        comp->setValueNotifyingHost (0.62f);   // snaps to true,  raw 0.62
+        purist->setValueNotifyingHost (0.41f); // snaps to false, raw 0.41
+
+        proc.setStateInformation (state.getData(), (int) state.getSize());
+
+        expect (std::abs (comp->getValue() - 1.0f) < 0.05f,
+                "discrete parameter restores exactly (AGC In, got "
+                    + std::to_string (comp->getValue()) + ")");
+        expect (std::abs (purist->getValue() - 0.0f) < 0.05f,
+                "discrete parameter restores exactly (Purist, got "
+                    + std::to_string (purist->getValue()) + ")");
+    }
+
     std::cout << "\n" << (failures == 0 ? "ALL TESTS PASSED" : "TESTS FAILED")
               << std::endl;
 

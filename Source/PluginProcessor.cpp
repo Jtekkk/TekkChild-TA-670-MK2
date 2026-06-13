@@ -520,13 +520,29 @@ void TekkChild670Processor::getStateInformation (juce::MemoryBlock& destData)
 
 void TekkChild670Processor::setStateInformation (const void* data, int sizeInBytes)
 {
-    if (auto xml = getXmlFromBinary (data, sizeInBytes))
-        if (xml->hasTagName (apvts.state.getType()))
-        {
-            auto tree = juce::ValueTree::fromXml (*xml);
-            currentProgram = (int) tree.getProperty ("currentProgram", 0);
-            apvts.replaceState (tree);
-        }
+    auto xml = getXmlFromBinary (data, sizeInBytes);
+    if (xml == nullptr || ! xml->hasTagName (apvts.state.getType()))
+        return;
+
+    auto tree = juce::ValueTree::fromXml (*xml);
+    currentProgram = (int) tree.getProperty ("currentProgram", 0);
+    apvts.replaceState (tree);
+
+    // replaceState only re-syncs parameters whose (snapped) tree value changed.
+    // A discrete parameter (bool / choice) stores an un-snapped raw value, so if
+    // a prior value snapped to the same bin as the restored one, replaceState
+    // leaves the raw value stale. Re-apply every stored value so each
+    // parameter's normalised value matches the state exactly after a restore.
+    std::function<void (const juce::ValueTree&)> reapply = [&] (const juce::ValueTree& node)
+    {
+        if (node.hasProperty ("id"))
+            if (auto* p = apvts.getParameter (node["id"].toString()))
+                p->setValueNotifyingHost (p->convertTo0to1 ((float) node["value"]));
+
+        for (auto child : node)
+            reapply (child);
+    };
+    reapply (tree);
 }
 
 //==============================================================================
