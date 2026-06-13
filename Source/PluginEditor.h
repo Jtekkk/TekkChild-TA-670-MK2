@@ -78,15 +78,15 @@ private:
     GainReductionMeter meter;
     LevelMeter inMeter, outMeter;
 
-    juce::Slider input, threshold, timeConstant, dcThreshold, mix, output;
-    juce::Label  inputLb, thresholdLb, timeConstantLb, dcThresholdLb, mixLb, outputLb;
+    juce::Slider input, threshold, timeConstant, dcThreshold, mix, output, dryGain;
+    juce::Label  inputLb, thresholdLb, timeConstantLb, dcThresholdLb, mixLb, outputLb, dryGainLb;
 
     juce::Label        hpfLb;
     juce::ComboBox     hpfBox;
     juce::ToggleButton compInBtn { "AGC IN" };
 
     std::unique_ptr<SliderAttachment> inputAt, thresholdAt, timeConstantAt,
-                                      dcThresholdAt, mixAt, outputAt;
+                                      dcThresholdAt, mixAt, outputAt, dryGainAt;
     std::unique_ptr<ComboBoxAttachment> hpfAt;
     std::unique_ptr<ButtonAttachment>   compInAt;
 
@@ -121,14 +121,14 @@ private:
     juce::ComboBox presetBox;
     juce::TextButton prevPreset { "<" }, nextPreset { ">" };
 
-    juce::Label    modeLb, qualityLb, linkAmtLb;
+    juce::Label    modeLb, qualityLb, linkAmtLb, ironDriveLb;
     juce::ComboBox modeBox, qualityBox;
-    juce::Slider   linkAmtKnob;
-    juce::ToggleButton puristBtn { "PURIST" }, bypassBtn { "BYPASS" };
+    juce::Slider   linkAmtKnob, ironDriveKnob;
+    juce::ToggleButton puristBtn { "PURIST" }, bypassBtn { "BYPASS" }, noiseBtn { "HISS" };
 
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> modeAt, qualityAt;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   linkAmtAt;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>   puristAt, bypassAt;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   linkAmtAt, ironDriveAt;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>   puristAt, bypassAt, noiseAt;
 
     juce::Image chassis;  // cached hammered-metal background
     juce::Image faceArt;  // central faceplate graphic

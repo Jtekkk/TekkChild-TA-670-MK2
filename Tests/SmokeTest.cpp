@@ -361,6 +361,79 @@ int main()
         setParam (proc, "quality", 1.0f);
     }
 
+    // -- Iron drive ----------------------------------------------------------
+    {
+        setParam (proc, "quality", 0.0f); // Eco
+        setParam (proc, "mode",    0.0f);
+        setParam (proc, "compinA", 0.0f); // AGC out to isolate colour only
+        setParam (proc, "compinB", 0.0f);
+        setParam (proc, "inputA",  0.0f);
+        setParam (proc, "inputB",  0.0f);
+
+        setParam (proc, "irondrive", 10.0f);
+        const auto rLow = runSine (proc, buffer, 0.5f, 0.3, 220.0, fs);
+
+        setParam (proc, "irondrive", 190.0f);
+        proc.reset();
+        const auto rHigh = runSine (proc, buffer, 0.5f, 0.3, 220.0, fs);
+
+        expect (rLow.finite && rHigh.finite, "output is finite across iron drive range");
+        expect (rHigh.peak < 6.0f, "output stays bounded at max iron drive");
+
+        setParam (proc, "irondrive", 100.0f);
+        setParam (proc, "compinA",  1.0f);
+        setParam (proc, "compinB",  1.0f);
+    }
+
+    // -- Valve noise ---------------------------------------------------------
+    {
+        setParam (proc, "quality",    0.0f);
+        setParam (proc, "compinA",    0.0f);
+        setParam (proc, "compinB",    0.0f);
+        setParam (proc, "noisefloor", 1.0f);
+
+        // Feed silence and measure the resulting noise floor
+        buffer.clear();
+        juce::MidiBuffer midi;
+        double noisePow = 0.0;
+        for (int blk = 0; blk < 100; ++blk)
+        {
+            proc.processBlock (buffer, midi);
+            for (int i = 0; i < blockSize; ++i)
+                noisePow += (double) buffer.getSample (0, i) * buffer.getSample (0, i);
+        }
+        const double noiseRms = std::sqrt (noisePow / (100.0 * blockSize));
+
+        setParam (proc, "noisefloor", 0.0f);
+        setParam (proc, "compinA",    1.0f);
+        setParam (proc, "compinB",    1.0f);
+
+        expect (noiseRms > 1.0e-7, "valve hiss adds noise when enabled");
+        expect (noiseRms < 5.0e-4, "valve hiss is at a gentle calibrated level");
+    }
+
+    // -- Dry gain ------------------------------------------------------------
+    {
+        setParam (proc, "quality", 0.0f);
+        setParam (proc, "mode",    0.0f);
+        setParam (proc, "compinA", 0.0f); // AGC out: output ≈ mixAmt*wet + (1-mixAmt)*dry*dryGain
+        setParam (proc, "mixA",    50.0f);
+
+        setParam (proc, "drygainA", 6.0f);
+        const auto rBoost = runSine (proc, buffer, 0.3f, 0.1, 220.0, fs);
+
+        setParam (proc, "drygainA", -6.0f);
+        proc.reset();
+        const auto rCut = runSine (proc, buffer, 0.3f, 0.1, 220.0, fs);
+
+        expect (rBoost.outRmsDb > rCut.outRmsDb + 3.0,
+                "dry gain +6 dB raises output; -6 dB lowers it");
+
+        setParam (proc, "drygainA", 0.0f);
+        setParam (proc, "mixA", 100.0f);
+        setParam (proc, "compinA", 1.0f);
+    }
+
     // -- Factory presets -----------------------------------------------------
     {
         auto programIndex = [&proc] (const juce::String& name)
@@ -371,7 +444,7 @@ int main()
             return -1;
         };
 
-        expect (proc.getNumPrograms() >= 8,
+        expect (proc.getNumPrograms() >= 28,
                 "factory presets are exposed (" + std::to_string (proc.getNumPrograms()) + ")");
 
         const int master = programIndex ("Master Bus");

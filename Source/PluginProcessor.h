@@ -79,7 +79,7 @@ private:
     juce::AudioBuffer<float> dryBuffer;
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::None> dryDelay;
 
-    juce::SmoothedValue<float> inputGainSm[2], outputGainSm[2], mixSm[2];
+    juce::SmoothedValue<float> inputGainSm[2], outputGainSm[2], mixSm[2], dryGainSm[2];
 
     // Detector controls are smoothed at the (possibly oversampled) detector
     // rate so automating Threshold / DC Threshold glides instead of zippering.
@@ -110,9 +110,12 @@ private:
     std::atomic<float>* pScHpf[2] {};
     std::atomic<float>* pMix[2] {};
     std::atomic<float>* pOutput[2] {};
+    std::atomic<float>* pDryGain[2] {};
     std::atomic<float>* pCompIn[2] {};
     std::atomic<float>* pMode {};
     std::atomic<float>* pLinkAmount {};
+    std::atomic<float>* pIronDrive {};
+    std::atomic<float>* pNoiseFloor {};
     std::atomic<float>* pQuality {};
     std::atomic<float>* pPurist {};
 

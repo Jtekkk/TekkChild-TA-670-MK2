@@ -1,12 +1,14 @@
 #include "PluginProcessor.h"
 
+#include <limits>
+
 #include "Parameters.h"
 #include "PluginEditor.h"
 #include "Presets.h"
 
 namespace
 {
-constexpr float kScHpfTable[] = { 0.0f, 60.0f, 100.0f, 200.0f, 300.0f };
+constexpr float kScHpfTable[] = { 0.0f, 40.0f, 60.0f, 100.0f, 150.0f, 200.0f, 300.0f, 400.0f };
 
 // THRESHOLD is a 0..10 control as on the hardware: 0 leaves the programme
 // untouched at typical levels, 10 pulls the detector reference down to
@@ -20,8 +22,9 @@ float thresholdKnobToDb (float knob)
 //==============================================================================
 TekkChild670Processor::TekkChild670Processor()
     : AudioProcessor (BusesProperties()
-                          .withInput ("Input", juce::AudioChannelSet::stereo(), true)
-                          .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
+                          .withInput  ("Input",     juce::AudioChannelSet::stereo(), true)
+                          .withInput  ("Sidechain", juce::AudioChannelSet::stereo(), false)
+                          .withOutput ("Output",    juce::AudioChannelSet::stereo(), true)),
       apvts (*this, nullptr, "PARAMS", createParameterLayout())
 {
     using namespace tekk;
@@ -35,11 +38,14 @@ TekkChild670Processor::TekkChild670Processor()
         pScHpf[ch]        = apvts.getRawParameterValue (pid::forChannel (pid::scHpf, ch));
         pMix[ch]          = apvts.getRawParameterValue (pid::forChannel (pid::mix, ch));
         pOutput[ch]       = apvts.getRawParameterValue (pid::forChannel (pid::output, ch));
+        pDryGain[ch]      = apvts.getRawParameterValue (pid::forChannel (pid::dryGain, ch));
         pCompIn[ch]       = apvts.getRawParameterValue (pid::forChannel (pid::compIn, ch));
     }
 
     pMode       = apvts.getRawParameterValue (pid::mode);
     pLinkAmount = apvts.getRawParameterValue (pid::linkAmount);
+    pIronDrive  = apvts.getRawParameterValue (pid::ironDrive);
+    pNoiseFloor = apvts.getRawParameterValue (pid::noiseFloor);
     pQuality    = apvts.getRawParameterValue (pid::quality);
     pPurist     = apvts.getRawParameterValue (pid::purist);
 
@@ -58,7 +64,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout TekkChild670Processor::creat
         "1 - 0.2 ms / 0.3 s", "2 - 0.2 ms / 0.8 s", "3 - 0.4 ms / 2 s",
         "4 - 0.8 ms / 5 s",   "5 - auto (2 s / 10 s)", "6 - auto (0.3 s / 10 s / 25 s)"
     };
-    const juce::StringArray hpfChoices { "Off", "60 Hz", "100 Hz", "200 Hz", "300 Hz" };
+    const juce::StringArray hpfChoices {
+        "Off", "40 Hz", "60 Hz", "100 Hz", "150 Hz", "200 Hz", "300 Hz", "400 Hz"
+    };
 
     for (int ch = 0; ch < 2; ++ch)
     {
@@ -101,6 +109,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout TekkChild670Processor::creat
             j::NormalisableRange<float> (-24.0f, 12.0f, 0.1f), 0.0f,
             j::AudioParameterFloatAttributes().withLabel ("dB")));
 
+        group->addChild (std::make_unique<j::AudioParameterFloat> (
+            j::ParameterID (pid::forChannel (pid::dryGain, ch), 1), "Dry Gain" + sfx,
+            j::NormalisableRange<float> (-12.0f, 12.0f, 0.1f), 0.0f,
+            j::AudioParameterFloatAttributes().withLabel ("dB")));
+
         group->addChild (std::make_unique<j::AudioParameterBool> (
             j::ParameterID (pid::forChannel (pid::compIn, ch), 1), "AGC In" + sfx, true));
 
@@ -115,6 +128,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout TekkChild670Processor::creat
         j::ParameterID (pid::linkAmount, 1), "Link Amount",
         j::NormalisableRange<float> (0.0f, 100.0f, 0.1f), 100.0f,
         j::AudioParameterFloatAttributes().withLabel ("%")));
+
+    layout.add (std::make_unique<j::AudioParameterFloat> (
+        j::ParameterID (pid::ironDrive, 1), "Iron Drive",
+        j::NormalisableRange<float> (0.0f, 200.0f, 0.1f), 100.0f,
+        j::AudioParameterFloatAttributes().withLabel ("%")));
+
+    layout.add (std::make_unique<j::AudioParameterBool> (
+        j::ParameterID (pid::noiseFloor, 1), "Valve Hiss", false));
 
     layout.add (std::make_unique<j::AudioParameterChoice> (
         j::ParameterID (pid::quality, 1), "Engine",
@@ -151,15 +172,18 @@ void TekkChild670Processor::prepareToPlay (double sampleRate, int samplesPerBloc
 
     for (int ch = 0; ch < 2; ++ch)
     {
-        const float inGain  = juce::Decibels::decibelsToGain (pInput[ch]->load());
-        const float outGain = juce::Decibels::decibelsToGain (pOutput[ch]->load());
+        const float inGain   = juce::Decibels::decibelsToGain (pInput[ch]->load());
+        const float outGain  = juce::Decibels::decibelsToGain (pOutput[ch]->load());
+        const float dryGainV = juce::Decibels::decibelsToGain (pDryGain[ch]->load());
 
         inputGainSm[ch].reset (sampleRate, 0.02);
         outputGainSm[ch].reset (sampleRate, 0.02);
         mixSm[ch].reset (sampleRate, 0.02);
+        dryGainSm[ch].reset (sampleRate, 0.02);
         inputGainSm[ch].setCurrentAndTargetValue (inGain);
         outputGainSm[ch].setCurrentAndTargetValue (outGain);
         mixSm[ch].setCurrentAndTargetValue (pMix[ch]->load() * 0.01f);
+        dryGainSm[ch].setCurrentAndTargetValue (dryGainV);
     }
 
     activeQuality = -1;
@@ -187,6 +211,7 @@ void TekkChild670Processor::reset()
         inputGainSm[ch].setCurrentAndTargetValue (inputGainSm[ch].getTargetValue());
         outputGainSm[ch].setCurrentAndTargetValue (outputGainSm[ch].getTargetValue());
         mixSm[ch].setCurrentAndTargetValue (mixSm[ch].getTargetValue());
+        dryGainSm[ch].setCurrentAndTargetValue (dryGainSm[ch].getTargetValue());
         thresholdSm[ch].setCurrentAndTargetValue (thresholdSm[ch].getTargetValue());
         biasSm[ch].setCurrentAndTargetValue (biasSm[ch].getTargetValue());
         kneeSm[ch].setCurrentAndTargetValue (kneeSm[ch].getTargetValue());
@@ -203,8 +228,14 @@ bool TekkChild670Processor::isBusesLayoutSupported (const BusesLayout& layouts) 
     const auto& in  = layouts.getMainInputChannelSet();
     const auto& out = layouts.getMainOutputChannelSet();
 
-    return in == out
-        && (in == juce::AudioChannelSet::mono() || in == juce::AudioChannelSet::stereo());
+    if (in != out)
+        return false;
+    if (in != juce::AudioChannelSet::mono() && in != juce::AudioChannelSet::stereo())
+        return false;
+
+    // Optional sidechain bus: must be disabled or stereo.
+    const auto& sc = layouts.getChannelSet (true, 1);
+    return sc.isDisabled() || sc == juce::AudioChannelSet::stereo();
 }
 
 void TekkChild670Processor::applyQualityMode (int qualityIndex, bool reportLatencyNow)
@@ -277,7 +308,7 @@ tekk::ChannelParams TekkChild670Processor::paramsForChannel (int ch, bool purist
     p.kneeDb = juce::jmap (dc, -10.0f, 10.0f, 9.0f, 0.5f);
     p.biasDb = dc * 0.6f;
 
-    const int hpfIdx = juce::jlimit (0, 4, (int) pScHpf[ch]->load());
+    const int hpfIdx = juce::jlimit (0, 7, (int) pScHpf[ch]->load());
     p.scHpfHz = purist ? 0.0f : kScHpfTable[hpfIdx];
 
     return p;
@@ -288,10 +319,12 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
 {
     juce::ScopedNoDenormals noDenormals;
 
+    // numCh is the main signal channel count (1 or 2). Sidechain channels live
+    // at index mainChCount and above and must NOT be cleared.
     const int numCh = juce::jmin (2, getTotalNumInputChannels(), buffer.getNumChannels());
     const int n     = buffer.getNumSamples();
 
-    for (int ch = numCh; ch < buffer.getNumChannels(); ++ch)
+    for (int ch = numCh; ch < juce::jmin (2, buffer.getNumChannels()); ++ch)
         buffer.clear (ch, 0, n);
 
     if (n == 0 || numCh == 0)
@@ -349,11 +382,32 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
         inputGainSm[ch].setTargetValue (juce::Decibels::decibelsToGain (pInput[ch]->load()));
         outputGainSm[ch].setTargetValue (juce::Decibels::decibelsToGain (pOutput[ch]->load()));
         mixSm[ch].setTargetValue (purist ? 1.0f : pMix[ch]->load() * 0.01f);
+        dryGainSm[ch].setTargetValue (purist ? 1.0f
+                                             : juce::Decibels::decibelsToGain (pDryGain[ch]->load()));
+    }
+
+    // Iron drive and noise: applied once per block (tonal changes, not amplitude).
+    // In purist mode the drive reverts to its calibrated value and noise is off.
+    const float ironMul  = purist ? 1.0f : pIronDrive->load() * 0.01f;
+    const bool  noiseOn  = !purist && pNoiseFloor->load() > 0.5f;
+    for (int ch = 0; ch < numCh; ++ch)
+    {
+        channels[ch].setIronDrive (ironMul);
+        channels[ch].setNoiseEnabled (noiseOn);
     }
 
     // In purist mode the link is always hard (100%); otherwise the knob blends
     // from each channel keeping its own CV (0%) toward the max-of-two (100%).
     linkAmountSm.setTargetValue (purist ? 1.0f : pLinkAmount->load() * 0.01f);
+
+    // External sidechain: channels at index >= numCh belong to the SC bus.
+    // Sample at the base rate and hold across OS sub-samples (the CV network's
+    // attack time constant is far longer than any OS period at normal rates).
+    const bool  hasExtSC = getTotalNumInputChannels() > numCh
+                        && buffer.getNumChannels() > numCh;
+    const float* scPtr0 = hasExtSC ? buffer.getReadPointer (numCh) : nullptr;
+    const float* scPtr1 = (hasExtSC && buffer.getNumChannels() > numCh + 1)
+                        ? buffer.getReadPointer (numCh + 1) : scPtr0;
 
     // keep the true dry signal for the blend control
     for (int ch = 0; ch < numCh; ++ch)
@@ -397,6 +451,7 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
     float* d1 = numCh > 1 ? osBlock.getChannelPointer (1) : nullptr;
 
     float maxGr[2] = { 0.0f, 0.0f };
+    const int osRate = (osN > 0 && n > 0) ? osN / n : 1; // oversampling factor (1 or 4)
 
     for (int i = 0; i < osN; ++i)
     {
@@ -404,14 +459,19 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
         const float thr0    = thresholdSm[0].getNextValue();
         const float bias0   = biasSm[0].getNextValue();
         const float knee0   = kneeSm[0].getNextValue();
-        float cv0 = channels[0].computeControlVoltage (d0[i], thr0, bias0, knee0);
+
+        const int   base  = juce::jmin (i / osRate, n - 1);
+        const float extSc0 = scPtr0 ? scPtr0[base] : std::numeric_limits<float>::quiet_NaN();
+        float cv0 = channels[0].computeControlVoltage (d0[i], thr0, bias0, knee0, extSc0);
 
         if (d1 != nullptr)
         {
             const float thr1  = thresholdSm[1].getNextValue();
             const float bias1 = biasSm[1].getNextValue();
             const float knee1 = kneeSm[1].getNextValue();
-            float cv1 = channels[1].computeControlVoltage (d1[i], thr1, bias1, knee1);
+
+            const float extSc1 = scPtr1 ? scPtr1[base] : std::numeric_limits<float>::quiet_NaN();
+            float cv1 = channels[1].computeControlVoltage (d1[i], thr1, bias1, knee1, extSc1);
 
             if (linked)
             {
@@ -465,9 +525,10 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
             }
 
             const float mixAmt  = mixSm[ch].getNextValue();
+            const float dryMul  = dryGainSm[ch].getNextValue();
             const float outGain = outputGainSm[ch].getNextValue();
 
-            wet[i] = outGain * (mixAmt * wet[i] + (1.0f - mixAmt) * drySample);
+            wet[i] = outGain * (mixAmt * wet[i] + (1.0f - mixAmt) * dryMul * drySample);
         }
     }
 

@@ -393,6 +393,18 @@ ChannelStrip::ChannelStrip (TekkChild670Processor& p, int channelIndex, const ju
     setupKnob (mix,          mixLb,          "MIX");
     setupKnob (output,       outputLb,       "OUTPUT");
 
+    dryGain.setSliderStyle (juce::Slider::LinearBar);
+    dryGain.setTextValueSuffix (" dB");
+    dryGain.setColour (juce::Slider::trackColourId, colours::amber.withAlpha (0.5f));
+    dryGain.setColour (juce::Slider::textBoxTextColourId, colours::textDim);
+    addAndMakeVisible (dryGain);
+
+    dryGainLb.setText ("DRY GAIN", juce::dontSendNotification);
+    dryGainLb.setJustificationType (juce::Justification::centredLeft);
+    dryGainLb.setFont (juce::Font (juce::FontOptions (11.0f)));
+    dryGainLb.setColour (juce::Label::textColourId, colours::textDim);
+    addAndMakeVisible (dryGainLb);
+
     auto& apvts = processor.apvts;
 
     inputAt        = std::make_unique<SliderAttachment> (apvts, pid::forChannel (pid::input, channel), input);
@@ -401,6 +413,7 @@ ChannelStrip::ChannelStrip (TekkChild670Processor& p, int channelIndex, const ju
     dcThresholdAt  = std::make_unique<SliderAttachment> (apvts, pid::forChannel (pid::dcThreshold, channel), dcThreshold);
     mixAt          = std::make_unique<SliderAttachment> (apvts, pid::forChannel (pid::mix, channel), mix);
     outputAt       = std::make_unique<SliderAttachment> (apvts, pid::forChannel (pid::output, channel), output);
+    dryGainAt      = std::make_unique<SliderAttachment> (apvts, pid::forChannel (pid::dryGain, channel), dryGain);
 
     hpfLb.setText ("SC FILTER", juce::dontSendNotification);
     hpfLb.setFont (juce::Font (juce::FontOptions (12.0f)));
@@ -495,12 +508,17 @@ void ChannelStrip::resized()
         }
     };
 
-    layoutRow (r.removeFromTop (140), { &input, &threshold, &timeConstant },
+    layoutRow (r.removeFromTop (120), { &input, &threshold, &timeConstant },
                                       { &inputLb, &thresholdLb, &timeConstantLb });
-    layoutRow (r.removeFromTop (140), { &dcThreshold, &mix, &output },
+    layoutRow (r.removeFromTop (120), { &dcThreshold, &mix, &output },
                                       { &dcThresholdLb, &mixLb, &outputLb });
 
-    auto bottom = r.removeFromTop (30);
+    // Dry Gain strip: label left, linear bar fills the rest
+    auto dryRow = r.removeFromTop (28);
+    dryGainLb.setBounds (dryRow.removeFromLeft (72));
+    dryGain.setBounds (dryRow.reduced (2, 4));
+
+    auto bottom = r.removeFromTop (28);
     hpfLb.setBounds (bottom.removeFromLeft (66));
     hpfBox.setBounds (bottom.removeFromLeft (104).reduced (0, 3));
     compInBtn.setBounds (bottom.removeFromRight (92));
@@ -557,11 +575,27 @@ TekkChild670Editor::TekkChild670Editor (TekkChild670Processor& p)
 
     addAndMakeVisible (puristBtn);
     addAndMakeVisible (bypassBtn);
+    addAndMakeVisible (noiseBtn);
 
     puristAt = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         processor.apvts, tekk::pid::purist, puristBtn);
     bypassAt = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         processor.apvts, tekk::pid::bypass, bypassBtn);
+    noiseAt  = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
+        processor.apvts, tekk::pid::noiseFloor, noiseBtn);
+
+    ironDriveLb.setText ("IRON DRIVE", juce::dontSendNotification);
+    ironDriveLb.setFont (juce::Font (juce::FontOptions (12.0f)));
+    addAndMakeVisible (ironDriveLb);
+
+    ironDriveKnob.setSliderStyle (juce::Slider::LinearBar);
+    ironDriveKnob.setTextValueSuffix (" %");
+    ironDriveKnob.setColour (juce::Slider::trackColourId, tekk::colours::amber.withAlpha (0.55f));
+    ironDriveKnob.setColour (juce::Slider::textBoxTextColourId, tekk::colours::cream);
+    addAndMakeVisible (ironDriveKnob);
+
+    ironDriveAt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+        processor.apvts, tekk::pid::ironDrive, ironDriveKnob);
 
     // -- preset bar --
     presetLb.setText ("PRESET", juce::dontSendNotification);
@@ -590,7 +624,7 @@ TekkChild670Editor::TekkChild670Editor (TekkChild670Processor& p)
     refreshPresetBox();
     startTimerHz (8); // keep the box in step with host-driven program changes
 
-    setSize (960, 632);
+    setSize (960, 658);
 }
 
 void TekkChild670Editor::loadProgram (int index)
@@ -738,7 +772,10 @@ void TekkChild670Editor::resized()
     presetBox.setBounds (presetBar.removeFromLeft (240).reduced (2, 1));
     nextPreset.setBounds (presetBar.removeFromLeft (30).reduced (1));
 
-    auto footer = r.removeFromBottom (52).reduced (14, 10);
+    auto footerFull = r.removeFromBottom (78).reduced (14, 6);
+    // Split into two rows: controls on top, iron drive across the bottom.
+    auto footerRow2 = footerFull.removeFromBottom (26);
+    auto footer     = footerFull; // remaining ~36px for combos / toggles
 
     auto body = r.reduced (12, 6);
     const int colW  = 176;
@@ -747,6 +784,7 @@ void TekkChild670Editor::resized()
     faceArea = body.removeFromLeft (colW).reduced (6, 2);
     stripB.setBounds (body.reduced (4, 0));
 
+    // Footer row 1: mode, engine, link amount, purist, bypass
     modeLb.setBounds (footer.removeFromLeft (44));
     modeBox.setBounds (footer.removeFromLeft (130));
     footer.removeFromLeft (18);
@@ -756,8 +794,12 @@ void TekkChild670Editor::resized()
     bypassBtn.setBounds (footer.removeFromRight (92));
     puristBtn.setBounds (footer.removeFromRight (92));
 
-    // Link amount sits in the remaining centre space between engine box and buttons.
     footer.removeFromLeft (18);
     linkAmtLb.setBounds (footer.removeFromLeft (66));
     linkAmtKnob.setBounds (footer.removeFromLeft (130).reduced (0, 4));
+
+    // Footer row 2: iron drive (wide bar) and valve hiss toggle
+    noiseBtn.setBounds (footerRow2.removeFromRight (72));
+    ironDriveLb.setBounds (footerRow2.removeFromLeft (82));
+    ironDriveKnob.setBounds (footerRow2.reduced (2, 3));
 }
