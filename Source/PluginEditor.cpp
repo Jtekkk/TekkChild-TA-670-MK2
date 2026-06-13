@@ -13,9 +13,101 @@ const juce::Colour outline     { 0xff141416 };
 const juce::Colour cream       { 0xffe8e0c9 };
 const juce::Colour amber       { 0xffd49a3a };
 const juce::Colour textDim     { 0xffb9b3a4 };
-const juce::Colour needle      { 0xffb03a2e };
+const juce::Colour needle      { 0xff8c241a };
 const juce::Colour knobTrack   { 0xff3a3a40 };
+
+const juce::Colour metal       { 0xff55585f }; // gunmetal chassis base
+const juce::Colour glow        { 0xffff7a16 }; // backlit lamp orange
 } // namespace colours
+
+//==============================================================================
+// A hammered / brushed gunmetal texture, generated once and cached. Dappled
+// light and dark dimples over a vertical brushed gradient read as struck metal.
+inline juce::Image makeHammeredMetal (int w, int h, juce::Colour base, int seed)
+{
+    juce::Image img (juce::Image::RGB, juce::jmax (1, w), juce::jmax (1, h), false);
+    juce::Graphics g (img);
+
+    g.setGradientFill (juce::ColourGradient (base.brighter (0.16f), 0.0f, 0.0f,
+                                             base.darker (0.16f), 0.0f, (float) h, false));
+    g.fillAll();
+
+    juce::Random r (seed);
+
+    // hammered dimples: each is a soft highlight offset against a soft shadow
+    const int dimples = juce::jmax (60, (w * h) / 650);
+    for (int i = 0; i < dimples; ++i)
+    {
+        const float x   = r.nextFloat() * w;
+        const float y   = r.nextFloat() * h;
+        const float rad = 6.0f + r.nextFloat() * 12.0f;
+
+        g.setGradientFill (juce::ColourGradient (
+            juce::Colours::white.withAlpha (0.09f), x - rad * 0.4f, y - rad * 0.4f,
+            juce::Colours::transparentBlack,         x + rad,         y + rad, true));
+        g.fillEllipse (x - rad, y - rad, rad * 2.0f, rad * 2.0f);
+
+        g.setGradientFill (juce::ColourGradient (
+            juce::Colours::black.withAlpha (0.13f), x + rad * 0.45f, y + rad * 0.45f,
+            juce::Colours::transparentBlack,        x - rad,        y - rad, true));
+        g.fillEllipse (x - rad, y - rad, rad * 2.0f, rad * 2.0f);
+    }
+
+    // fine vertical brushing
+    for (int i = 0; i < w; i += 2)
+    {
+        const float a = r.nextFloat() * 0.03f;
+        g.setColour ((r.nextBool() ? juce::Colours::white : juce::Colours::black).withAlpha (a));
+        g.drawVerticalLine (i, 0.0f, (float) h);
+    }
+
+    // subtle edge vignette for depth
+    g.setGradientFill (juce::ColourGradient (juce::Colours::transparentBlack, w * 0.5f, h * 0.5f,
+                                             juce::Colours::black.withAlpha (0.22f), 0.0f, 0.0f, true));
+    g.fillRect (0, 0, w, h);
+
+    return img;
+}
+
+// A domed, slotted screw head with a recessed shadow ring.
+inline void drawScrew (juce::Graphics& g, float cx, float cy, float radius, float slotDeg)
+{
+    const juce::Rectangle<float> bounds (cx - radius, cy - radius, radius * 2.0f, radius * 2.0f);
+
+    // recess shadow under the head
+    g.setColour (juce::Colours::black.withAlpha (0.45f));
+    g.fillEllipse (bounds.expanded (1.6f).translated (0.0f, 1.0f));
+
+    // metal head, lit from top-left
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xffb9bcc2), cx - radius * 0.5f, cy - radius * 0.5f,
+                                             juce::Colour (0xff4c4e54), cx + radius * 0.6f, cy + radius * 0.6f, true));
+    g.fillEllipse (bounds);
+
+    g.setColour (juce::Colours::black.withAlpha (0.35f));
+    g.drawEllipse (bounds, 1.0f);
+
+    // slot (with a lit lower edge for depth)
+    const float a  = juce::degreesToRadians (slotDeg);
+    const juce::Point<float> c (cx, cy);
+    const auto p1 = c.getPointOnCircumference (radius * 0.72f, a);
+    const auto p2 = c.getPointOnCircumference (radius * 0.72f, a + juce::MathConstants<float>::pi);
+
+    g.setColour (juce::Colours::black.withAlpha (0.7f));
+    g.drawLine ({ p1, p2 }, radius * 0.34f);
+    g.setColour (juce::Colours::white.withAlpha (0.18f));
+    g.drawLine ({ p1.translated (0.0f, 0.8f), p2.translated (0.0f, 0.8f) }, radius * 0.14f);
+}
+
+// Recessed dark window (meter cut-out) with an inner bevel.
+inline void drawRecess (juce::Graphics& g, juce::Rectangle<float> r, float corner)
+{
+    g.setColour (juce::Colours::black.withAlpha (0.55f));
+    g.fillRoundedRectangle (r.expanded (2.0f), corner + 2.0f);
+
+    g.setGradientFill (juce::ColourGradient (juce::Colours::black, r.getX(), r.getY(),
+                                             juce::Colour (0xff202024), r.getX(), r.getBottom(), false));
+    g.fillRoundedRectangle (r, corner);
+}
 
 //==============================================================================
 TekkLookAndFeel::TekkLookAndFeel()
@@ -102,12 +194,23 @@ void GainReductionMeter::timerCallback()
 
 void GainReductionMeter::paint (juce::Graphics& g)
 {
-    auto r = getLocalBounds().toFloat().reduced (4.0f);
+    auto full = getLocalBounds().toFloat();
+    auto r    = full.reduced (7.0f); // leave a margin for the glow halo
 
-    g.setColour (colours::cream);
+    // recessed metal window the meter is mounted in
+    drawRecess (g, r.expanded (3.0f), 8.0f);
+
+    // warm backlight bleeding out around the glass
+    g.setGradientFill (juce::ColourGradient (colours::glow.withAlpha (0.55f), r.getCentreX(), r.getCentreY(),
+                                             juce::Colours::transparentBlack, r.getCentreX(), r.getY() - 6.0f, true));
+    g.fillRoundedRectangle (full, 9.0f);
+
+    // backlit meter face: bright lamp behind an amber scale
+    juce::ColourGradient face (juce::Colour (0xffffc879), r.getCentreX(), r.getBottom(),
+                               juce::Colour (0xff6e2f0c), r.getCentreX(), r.getY(), false);
+    face.addColour (0.45, juce::Colour (0xffe98a2c));
+    g.setGradientFill (face);
     g.fillRoundedRectangle (r, 6.0f);
-    g.setColour (colours::outline);
-    g.drawRoundedRectangle (r, 6.0f, 2.0f);
 
     const juce::Point<float> pivot (r.getCentreX(), r.getBottom() - 8.0f);
     const float needleLen = r.getHeight() * 0.72f;
@@ -119,15 +222,15 @@ void GainReductionMeter::paint (juce::Graphics& g)
         return juce::jmap (t, 0.38f, -0.38f) * juce::MathConstants<float>::pi;
     };
 
-    g.setColour (juce::Colour (0xff3c3326));
-    g.setFont (juce::Font (juce::FontOptions (10.0f)));
+    g.setColour (juce::Colour (0xff3a1c08).withAlpha (0.85f));
+    g.setFont (juce::Font (juce::FontOptions (10.0f)).boldened());
 
     for (float tick : { 0.0f, 5.0f, 10.0f, 15.0f, 20.0f })
     {
         const float a  = angleFor (tick);
         const auto p1  = pivot.getPointOnCircumference (needleLen, a);
         const auto p2  = pivot.getPointOnCircumference (needleLen - 6.0f, a);
-        g.drawLine (juce::Line<float> (p1, p2), 1.2f);
+        g.drawLine (juce::Line<float> (p1, p2), 1.4f);
 
         const auto tp = pivot.getPointOnCircumference (needleLen + 8.0f, a);
         g.drawText (juce::String ((int) tick),
@@ -140,12 +243,25 @@ void GainReductionMeter::paint (juce::Graphics& g)
                     .withCentre ({ r.getCentreX(), r.getBottom() - 14.0f }),
                 juce::Justification::centred);
 
-    const float a = angleFor (needleDb);
-    g.setColour (colours::needle);
-    g.drawLine (juce::Line<float> (pivot, pivot.getPointOnCircumference (needleLen, a)), 2.0f);
+    // glass reflection across the top of the face
+    g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.22f), r.getX(), r.getY(),
+                                             juce::Colours::transparentBlack, r.getX(), r.getCentreY(), false));
+    g.fillRoundedRectangle (r.withTrimmedBottom (r.getHeight() * 0.55f), 6.0f);
 
-    g.setColour (colours::outline);
-    g.fillEllipse (juce::Rectangle<float> (9.0f, 9.0f).withCentre (pivot));
+    const float a = angleFor (needleDb);
+    const auto tip = pivot.getPointOnCircumference (needleLen, a);
+
+    g.setColour (juce::Colours::black.withAlpha (0.35f)); // needle shadow
+    g.drawLine ({ pivot.translated (1.2f, 1.2f), tip.translated (1.2f, 1.2f) }, 2.2f);
+    g.setColour (colours::needle);
+    g.drawLine ({ pivot, tip }, 2.2f);
+
+    // hub
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff70757c), pivot.x - 3.0f, pivot.y - 3.0f,
+                                             juce::Colour (0xff202024), pivot.x + 3.0f, pivot.y + 3.0f, true));
+    g.fillEllipse (juce::Rectangle<float> (11.0f, 11.0f).withCentre (pivot));
+    g.setColour (juce::Colours::black.withAlpha (0.6f));
+    g.drawEllipse (juce::Rectangle<float> (11.0f, 11.0f).withCentre (pivot), 1.0f);
 }
 
 //==============================================================================
@@ -170,11 +286,11 @@ void LevelMeter::timerCallback()
 
 void LevelMeter::paint (juce::Graphics& g)
 {
-    auto r = getLocalBounds().toFloat();
-    auto caption = r.removeFromBottom (14.0f);
+    auto full = getLocalBounds().toFloat();
+    auto caption = full.removeFromBottom (14.0f);
+    auto r = full;
 
-    g.setColour (juce::Colour (0xff141416));
-    g.fillRoundedRectangle (r, 3.0f);
+    drawRecess (g, r, 3.0f);
 
     constexpr float minDb = -60.0f, maxDb = 6.0f;
     auto yFor = [&] (float db)
@@ -183,7 +299,13 @@ void LevelMeter::paint (juce::Graphics& g)
         return r.getBottom() - t * r.getHeight();
     };
 
-    // filled segments, coloured by zone
+    const float bx = r.getX() + 1.5f, bw = r.getWidth() - 3.0f;
+
+    // unlit scale ghost, so the bar reads against a faint backlit column
+    g.setColour (colours::glow.withAlpha (0.05f));
+    g.fillRect (bx, r.getY() + 1.0f, bw, r.getHeight() - 2.0f);
+
+    // filled segments, coloured by zone, with a soft glow under the lit part
     auto fillTo = [&] (float lo, float hi, juce::Colour c)
     {
         const float top = yFor (std::min (levelDb, hi));
@@ -191,26 +313,39 @@ void LevelMeter::paint (juce::Graphics& g)
         if (levelDb > lo && bot > top)
         {
             g.setColour (c);
-            g.fillRect (r.getX() + 1.5f, top, r.getWidth() - 3.0f, bot - top);
+            g.fillRect (bx, top, bw, bot - top);
         }
     };
 
-    fillTo (minDb, -12.0f, juce::Colour (0xff4a9e6a)); // green
-    fillTo (-12.0f, -3.0f, colours::amber);            // amber
-    fillTo (-3.0f, maxDb, colours::needle);            // red
+    fillTo (minDb, -12.0f, juce::Colour (0xff58c47e)); // green
+    fillTo (-12.0f, -3.0f, juce::Colour (0xfff0a92e)); // amber
+    fillTo (-3.0f, maxDb, juce::Colour (0xffe2483a));  // red
+
+    if (levelDb > minDb)
+    {
+        const float top = yFor (levelDb);
+        g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.5f), bx, top,
+                                                 juce::Colours::transparentBlack, bx, top + 10.0f, false));
+        g.fillRect (bx, top, bw, 10.0f); // bright lit tip
+    }
 
     // 0 dBFS reference and peak marker
-    g.setColour (juce::Colours::white.withAlpha (0.25f));
+    g.setColour (juce::Colours::white.withAlpha (0.22f));
     g.drawHorizontalLine ((int) yFor (0.0f), r.getX(), r.getRight());
 
     if (peakDb > minDb)
     {
-        g.setColour (peakDb > -1.0f ? colours::needle : colours::cream);
-        g.fillRect (r.getX() + 1.5f, yFor (peakDb) - 1.0f, r.getWidth() - 3.0f, 2.0f);
+        g.setColour (peakDb > -1.0f ? juce::Colour (0xffe2483a) : colours::cream);
+        g.fillRect (bx, yFor (peakDb) - 1.0f, bw, 2.0f);
     }
 
+    // glass sheen
+    g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.10f), r.getX(), r.getY(),
+                                             juce::Colours::transparentBlack, r.getRight(), r.getY(), false));
+    g.fillRoundedRectangle (r, 3.0f);
+
     g.setColour (colours::textDim);
-    g.setFont (juce::Font (juce::FontOptions (9.5f)));
+    g.setFont (juce::Font (juce::FontOptions (9.5f)).boldened());
     g.drawText (captionText, caption, juce::Justification::centred);
 }
 
@@ -276,15 +411,34 @@ void ChannelStrip::paint (juce::Graphics& g)
 {
     auto r = getLocalBounds().toFloat().reduced (2.0f);
 
-    g.setColour (colours::panel);
-    g.fillRoundedRectangle (r, 8.0f);
-    g.setColour (colours::outline);
-    g.drawRoundedRectangle (r, 8.0f, 1.0f);
+    // raised brushed-metal sub-plate, screwed onto the chassis
+    g.setColour (juce::Colours::black.withAlpha (0.35f));
+    g.fillRoundedRectangle (r.translated (0.0f, 1.5f), 8.0f); // drop shadow
 
-    g.setColour (colours::amber);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff3e4046), r.getCentreX(), r.getY(),
+                                             juce::Colour (0xff2a2b2f), r.getCentreX(), r.getBottom(), false));
+    g.fillRoundedRectangle (r, 8.0f);
+
+    // top bevel highlight / bottom shade for a raised plate
+    g.setColour (juce::Colours::white.withAlpha (0.10f));
+    g.drawLine (r.getX() + 8.0f, r.getY() + 1.0f, r.getRight() - 8.0f, r.getY() + 1.0f, 1.2f);
+    g.setColour (colours::outline);
+    g.drawRoundedRectangle (r, 8.0f, 1.2f);
+
+    // engraved title
+    auto titleArea = getLocalBounds().removeFromTop (30).reduced (28, 0);
     g.setFont (juce::Font (juce::FontOptions (13.0f)).boldened());
-    g.drawText (title, getLocalBounds().removeFromTop (30).reduced (14, 0),
-                juce::Justification::centredLeft);
+    g.setColour (juce::Colours::black.withAlpha (0.6f));
+    g.drawText (title, titleArea.translated (0, 1), juce::Justification::centredLeft);
+    g.setColour (colours::amber);
+    g.drawText (title, titleArea, juce::Justification::centredLeft);
+
+    // corner screws
+    const float inset = 13.0f;
+    drawScrew (g, r.getX() + inset,     r.getY() + inset,      4.5f, 25.0f);
+    drawScrew (g, r.getRight() - inset, r.getY() + inset,      4.5f, -40.0f);
+    drawScrew (g, r.getX() + inset,     r.getBottom() - inset, 4.5f, 70.0f);
+    drawScrew (g, r.getRight() - inset, r.getBottom() - inset, 4.5f, 10.0f);
 }
 
 void ChannelStrip::resized()
@@ -422,32 +576,52 @@ TekkChild670Editor::~TekkChild670Editor()
 
 void TekkChild670Editor::paint (juce::Graphics& g)
 {
-    g.fillAll (tekk::colours::background);
+    // hammered-metal chassis
+    if (chassis.isValid())
+        g.drawImage (chassis, getLocalBounds().toFloat());
+    else
+        g.fillAll (tekk::colours::metal);
 
     auto header = getLocalBounds().removeFromTop (52);
 
-    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff2c2c33),
-                                             0.0f, 0.0f,
-                                             tekk::colours::background,
-                                             0.0f, (float) header.getBottom(), false));
+    // darker brushed nameplate across the top
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff34363c), 0.0f, 0.0f,
+                                             juce::Colour (0xff202024), 0.0f, (float) header.getBottom(), false));
     g.fillRect (header);
+    g.setColour (juce::Colours::white.withAlpha (0.06f));
+    g.drawHorizontalLine (1, 0.0f, (float) getWidth());
 
-    g.setColour (tekk::colours::cream);
+    g.setColour (juce::Colours::black.withAlpha (0.6f));
     g.setFont (juce::Font (juce::FontOptions (21.0f)).boldened());
-    g.drawText ("TEKKCHILD TA-670 MK2", header.reduced (16, 0),
+    g.drawText ("TEKKCHILD TA-670 MK2", header.reduced (40, 0).translated (0, 1),
+                juce::Justification::centredLeft);
+    g.setColour (tekk::colours::cream);
+    g.drawText ("TEKKCHILD TA-670 MK2", header.reduced (40, 0),
                 juce::Justification::centredLeft);
 
     g.setColour (tekk::colours::amber);
     g.setFont (juce::Font (juce::FontOptions (11.0f)));
     g.drawText ("TEKK AUDIO ENGINEERING  ·  VARIABLE-MU TUBE COMPRESSOR",
-                header.reduced (16, 0), juce::Justification::centredRight);
+                header.reduced (74, 0), juce::Justification::centredRight);
 
-    g.setColour (tekk::colours::amber.withAlpha (0.6f));
-    g.fillRect (0, header.getBottom() - 1, getWidth(), 1);
+    g.setColour (juce::Colour (0xff141416));
+    g.fillRect (0, header.getBottom() - 1, getWidth(), 2);
+    g.setColour (tekk::colours::amber.withAlpha (0.4f));
+    g.fillRect (0, header.getBottom(), getWidth(), 1);
+
+    // chassis corner screws
+    for (auto p : { juce::Point<float> (18.0f, 26.0f),
+                    juce::Point<float> ((float) getWidth() - 18.0f, 26.0f),
+                    juce::Point<float> (18.0f, (float) getHeight() - 18.0f),
+                    juce::Point<float> ((float) getWidth() - 18.0f, (float) getHeight() - 18.0f) })
+        tekk::drawScrew (g, p.x, p.y, 6.0f, 30.0f * (p.x + p.y));
 }
 
 void TekkChild670Editor::resized()
 {
+    if (chassis.getWidth() != getWidth() || chassis.getHeight() != getHeight())
+        chassis = tekk::makeHammeredMetal (getWidth(), getHeight(), tekk::colours::metal, 7);
+
     auto r = getLocalBounds();
     r.removeFromTop (52); // header, painted
 

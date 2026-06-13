@@ -128,5 +128,7 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> modeAt, qualityAt;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>   puristAt, bypassAt;
 
+    juce::Image chassis; // cached hammered-metal background
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TekkChild670Editor)
 };
