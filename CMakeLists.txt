@@ -83,3 +83,26 @@ target_link_libraries(TekkChild670Tests
         juce::juce_dsp
         juce::juce_recommended_config_flags
 )
+
+# Offline characterisation harness: writes CSV + SVG measurement plots
+juce_add_console_app(TekkChild670Measure PRODUCT_NAME "TekkChild670Measure")
+
+target_sources(TekkChild670Measure PRIVATE
+    Tools/Measure.cpp
+    Source/PluginProcessor.cpp
+    Source/PluginEditor.cpp
+)
+
+target_include_directories(TekkChild670Measure PRIVATE Source)
+
+target_compile_definitions(TekkChild670Measure PRIVATE
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+)
+
+target_link_libraries(TekkChild670Measure
+    PRIVATE
+        juce::juce_audio_utils
+        juce::juce_dsp
+        juce::juce_recommended_config_flags
+)

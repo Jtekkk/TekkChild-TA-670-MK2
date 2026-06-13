@@ -158,6 +158,23 @@ Hardening that the headless tests lock in:
 - **No host calls on the audio thread.** Engine-mode latency changes are
   reported from the message thread via an async update.
 
+## Measurement & characterisation
+
+`Tools/Measure.cpp` (target `TekkChild670Measure`) is an offline harness that
+runs the real processing chain and writes CSV + SVG plots of the static
+compression curve, THD vs level, THD vs frequency, and frequency response.
+It needs no external plotting dependency and runs in CI.
+
+```sh
+cmake --build build --target TekkChild670Measure
+./build/TekkChild670Measure_artefacts/Release/TekkChild670Measure measurements
+```
+
+See [`measurements/`](measurements/) for the plots and the current model's
+headline numbers. These curves are the data you calibrate the DSP constants
+against; today they confirm the intended behaviour (soft-knee progressive
+ratio, low-frequency-weighted harmonics, flat response with a ~6 Hz roll-off).
+
 ## Engineering status
 
 This repository contains the full plugin architecture: complete parameter

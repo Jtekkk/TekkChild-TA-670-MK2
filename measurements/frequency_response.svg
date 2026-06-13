@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="840" height="560" viewBox="0 0 840 560" font-family="Helvetica,Arial,sans-serif">
+<rect width="840" height="560" fill="#ffffff"/>
+<text x="420" y="28" text-anchor="middle" font-size="19" font-weight="bold" fill="#1d1d20">Frequency response (-30 dBFS, compressor out)</text>
+<rect x="78.0" y="52.0" width="592.0" height="444.0" fill="none" stroke="#cccccc" stroke-width="1"/>
+<line x1="78.0" y1="52.0" x2="78.0" y2="496.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="78.0" y1="496.0" x2="78.0" y2="501.0" stroke="#888888" stroke-width="1"/>
+<text x="78.0" y="514.0" text-anchor="middle" font-size="12" fill="#444444">10</text>
+<line x1="127.5" y1="52.0" x2="127.5" y2="496.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="127.5" y1="496.0" x2="127.5" y2="501.0" stroke="#888888" stroke-width="1"/>
+<text x="127.5" y="514.0" text-anchor="middle" font-size="12" fill="#444444">20</text>
+<line x1="192.9" y1="52.0" x2="192.9" y2="496.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="192.9" y1="496.0" x2="192.9" y2="501.0" stroke="#888888" stroke-width="1"/>
+<text x="192.9" y="514.0" text-anchor="middle" font-size="12" fill="#444444">50</text>
+<line x1="242.4" y1="52.0" x2="242.4" y2="496.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="242.4" y1="496.0" x2="242.4" y2="501.0" stroke="#888888" stroke-width="1"/>
+<text x="242.4" y="514.0" text-anchor="middle" font-size="12" fill="#444444">100</text>
+<line x1="291.8" y1="52.0" x2="291.8" y2="496.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="291.8" y1="496.0" x2="291.8" y2="501.0" stroke="#888888" stroke-width="1"/>
+<text x="291.8" y="514.0" text-anchor="middle" font-size="12" fill="#444444">200</text>
+<line x1="357.2" y1="52.0" x2="357.2" y2="496.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="357.2" y1="496.0" x2="357.2" y2="501.0" stroke="#888888" stroke-width="1"/>
+<text x="357.2" y="514.0" text-anchor="middle" font-size="12" fill="#444444">500</text>
+<line x1="406.7" y1="52.0" x2="406.7" y2="496.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="406.7" y1="496.0" x2="406.7" y2="501.0" stroke="#888888" stroke-width="1"/>
+<text x="406.7" y="514.0" text-anchor="middle" font-size="12" fill="#444444">1000</text>
+<line x1="456.2" y1="52.0" x2="456.2" y2="496.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="456.2" y1="496.0" x2="456.2" y2="501.0" stroke="#888888" stroke-width="1"/>
+<text x="456.2" y="514.0" text-anchor="middle" font-size="12" fill="#444444">2000</text>
+<line x1="521.6" y1="52.0" x2="521.6" y2="496.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="521.6" y1="496.0" x2="521.6" y2="501.0" stroke="#888888" stroke-width="1"/>
+<text x="521.6" y="514.0" text-anchor="middle" font-size="12" fill="#444444">5000</text>
+<line x1="571.1" y1="52.0" x2="571.1" y2="496.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="571.1" y1="496.0" x2="571.1" y2="501.0" stroke="#888888" stroke-width="1"/>
+<text x="571.1" y="514.0" text-anchor="middle" font-size="12" fill="#444444">10000</text>
+<line x1="620.5" y1="52.0" x2="620.5" y2="496.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="620.5" y1="496.0" x2="620.5" y2="501.0" stroke="#888888" stroke-width="1"/>
+<text x="620.5" y="514.0" text-anchor="middle" font-size="12" fill="#444444">20000</text>
+<line x1="78.0" y1="496.0" x2="670.0" y2="496.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="73.0" y1="496.0" x2="78.0" y2="496.0" stroke="#888888" stroke-width="1"/>
+<text x="69.0" y="500.0" text-anchor="end" font-size="12" fill="#444444">-12</text>
+<line x1="78.0" y1="436.8" x2="670.0" y2="436.8" stroke="#eeeeee" stroke-width="1"/>
+<line x1="73.0" y1="436.8" x2="78.0" y2="436.8" stroke="#888888" stroke-width="1"/>
+<text x="69.0" y="440.8" text-anchor="end" font-size="12" fill="#444444">-10</text>
+<line x1="78.0" y1="377.6" x2="670.0" y2="377.6" stroke="#eeeeee" stroke-width="1"/>
+<line x1="73.0" y1="377.6" x2="78.0" y2="377.6" stroke="#888888" stroke-width="1"/>
+<text x="69.0" y="381.6" text-anchor="end" font-size="12" fill="#444444">-8</text>
+<line x1="78.0" y1="318.4" x2="670.0" y2="318.4" stroke="#eeeeee" stroke-width="1"/>
+<line x1="73.0" y1="318.4" x2="78.0" y2="318.4" stroke="#888888" stroke-width="1"/>
+<text x="69.0" y="322.4" text-anchor="end" font-size="12" fill="#444444">-6</text>
+<line x1="78.0" y1="259.2" x2="670.0" y2="259.2" stroke="#eeeeee" stroke-width="1"/>
+<line x1="73.0" y1="259.2" x2="78.0" y2="259.2" stroke="#888888" stroke-width="1"/>
+<text x="69.0" y="263.2" text-anchor="end" font-size="12" fill="#444444">-4</text>
+<line x1="78.0" y1="200.0" x2="670.0" y2="200.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="73.0" y1="200.0" x2="78.0" y2="200.0" stroke="#888888" stroke-width="1"/>
+<text x="69.0" y="204.0" text-anchor="end" font-size="12" fill="#444444">-2</text>
+<line x1="78.0" y1="140.8" x2="670.0" y2="140.8" stroke="#eeeeee" stroke-width="1"/>
+<line x1="73.0" y1="140.8" x2="78.0" y2="140.8" stroke="#888888" stroke-width="1"/>
+<text x="69.0" y="144.8" text-anchor="end" font-size="12" fill="#444444">0</text>
+<line x1="78.0" y1="81.6" x2="670.0" y2="81.6" stroke="#eeeeee" stroke-width="1"/>
+<line x1="73.0" y1="81.6" x2="78.0" y2="81.6" stroke="#888888" stroke-width="1"/>
+<text x="69.0" y="85.6" text-anchor="end" font-size="12" fill="#444444">2</text>
+<text x="374.0" y="538.0" text-anchor="middle" font-size="13" fill="#1d1d20">Frequency (Hz)</text>
+<text x="22" y="274" text-anchor="middle" font-size="13" fill="#1d1d20" transform="rotate(-90 22 274)">Magnitude (dB)</text>
+<path d=" M89.3,221.6 L105.2,195.2 L118.3,179.5 L138.8,162.7 L154.7,155.2 L167.7,150.7 L183.7,147.3 L200.5,144.9 L214.2,143.6 L230.7,142.6 L244.1,142.0 L260.5,141.6 L275.1,141.3 L290.5,141.1 L305.8,141.0 L321.2,140.9 L336.1,140.9 L351.3,140.9 L366.4,140.8 L381.6,140.8 L396.8,140.8 L411.9,140.8 L427.1,140.8 L442.3,140.8 L457.5,140.8 L472.7,140.8 L487.9,140.8 L503.0,140.8 L518.2,140.8 L533.4,140.8 L548.6,140.8 L563.7,140.9 L578.9,140.8 L594.1,140.8 L609.3,140.8 L624.5,140.8 L639.6,140.8 L654.8,140.9 L670.0,140.8" fill="none" stroke="#3a9a5a" stroke-width="2"/>
+<line x1="684.0" y1="58.0" x2="708.0" y2="58.0" stroke="#3a9a5a" stroke-width="2.5"/>
+<text x="714.0" y="62.0" text-anchor="start" font-size="12" fill="#1d1d20">Magnitude</text>
+</svg>

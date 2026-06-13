@@ -53,6 +53,18 @@ jobs:
             --strictness-level 10 --validate \
             "build/TekkChild670_artefacts/Release/VST3/TekkChild TA-670 MK2.vst3"
 
+      - name: Generate characterisation plots
+        if: runner.os == 'Linux'
+        run: |
+          ./build/TekkChild670Measure_artefacts/Release/TekkChild670Measure measurements
+
+      - name: Upload measurements
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: TekkChild-TA-670-MK2-measurements
+          path: measurements/*.svg
+
       - name: Upload VST3
         uses: actions/upload-artifact@v4
         with:

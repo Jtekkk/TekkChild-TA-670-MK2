@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="840" height="560" viewBox="0 0 840 560" font-family="Helvetica,Arial,sans-serif">
+<rect width="840" height="560" fill="#ffffff"/>
+<text x="420" y="28" text-anchor="middle" font-size="19" font-weight="bold" fill="#1d1d20">Harmonic distortion vs level (1 kHz, compressor out)</text>
+<rect x="78.0" y="52.0" width="592.0" height="444.0" fill="none" stroke="#cccccc" stroke-width="1"/>
+<line x1="162.6" y1="52.0" x2="162.6" y2="496.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="162.6" y1="496.0" x2="162.6" y2="501.0" stroke="#888888" stroke-width="1"/>
+<text x="162.6" y="514.0" text-anchor="middle" font-size="12" fill="#444444">-30</text>
+<line x1="303.5" y1="52.0" x2="303.5" y2="496.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="303.5" y1="496.0" x2="303.5" y2="501.0" stroke="#888888" stroke-width="1"/>
+<text x="303.5" y="514.0" text-anchor="middle" font-size="12" fill="#444444">-20</text>
+<line x1="444.5" y1="52.0" x2="444.5" y2="496.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="444.5" y1="496.0" x2="444.5" y2="501.0" stroke="#888888" stroke-width="1"/>
+<text x="444.5" y="514.0" text-anchor="middle" font-size="12" fill="#444444">-10</text>
+<line x1="585.4" y1="52.0" x2="585.4" y2="496.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="585.4" y1="496.0" x2="585.4" y2="501.0" stroke="#888888" stroke-width="1"/>
+<text x="585.4" y="514.0" text-anchor="middle" font-size="12" fill="#444444">0</text>
+<line x1="78.0" y1="496.0" x2="670.0" y2="496.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="73.0" y1="496.0" x2="78.0" y2="496.0" stroke="#888888" stroke-width="1"/>
+<text x="69.0" y="500.0" text-anchor="end" font-size="12" fill="#444444">0</text>
+<line x1="78.0" y1="422.0" x2="670.0" y2="422.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="73.0" y1="422.0" x2="78.0" y2="422.0" stroke="#888888" stroke-width="1"/>
+<text x="69.0" y="426.0" text-anchor="end" font-size="12" fill="#444444">2</text>
+<line x1="78.0" y1="348.0" x2="670.0" y2="348.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="73.0" y1="348.0" x2="78.0" y2="348.0" stroke="#888888" stroke-width="1"/>
+<text x="69.0" y="352.0" text-anchor="end" font-size="12" fill="#444444">4</text>
+<line x1="78.0" y1="274.0" x2="670.0" y2="274.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="73.0" y1="274.0" x2="78.0" y2="274.0" stroke="#888888" stroke-width="1"/>
+<text x="69.0" y="278.0" text-anchor="end" font-size="12" fill="#444444">6</text>
+<line x1="78.0" y1="200.0" x2="670.0" y2="200.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="73.0" y1="200.0" x2="78.0" y2="200.0" stroke="#888888" stroke-width="1"/>
+<text x="69.0" y="204.0" text-anchor="end" font-size="12" fill="#444444">8</text>
+<line x1="78.0" y1="126.0" x2="670.0" y2="126.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="73.0" y1="126.0" x2="78.0" y2="126.0" stroke="#888888" stroke-width="1"/>
+<text x="69.0" y="130.0" text-anchor="end" font-size="12" fill="#444444">10</text>
+<line x1="78.0" y1="52.0" x2="670.0" y2="52.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="73.0" y1="52.0" x2="78.0" y2="52.0" stroke="#888888" stroke-width="1"/>
+<text x="69.0" y="56.0" text-anchor="end" font-size="12" fill="#444444">12</text>
+<text x="374.0" y="538.0" text-anchor="middle" font-size="13" fill="#1d1d20">Input level (dBFS)</text>
+<text x="22" y="274" text-anchor="middle" font-size="13" fill="#1d1d20" transform="rotate(-90 22 274)">THD (%)</text>
+<path d=" M78.0,495.0 L106.2,494.7 L134.4,494.4 L162.6,493.9 L190.8,493.4 L219.0,492.7 L247.1,491.9 L275.3,490.8 L303.5,489.4 L331.7,487.6 L359.9,485.2 L388.1,481.9 L416.3,477.5 L444.5,471.3 L472.7,462.2 L500.9,448.8 L529.0,428.7 L557.2,398.4 L585.4,353.6 L613.6,288.9 L641.8,199.2 L670.0,82.0" fill="none" stroke="#d49a3a" stroke-width="2"/>
+<line x1="684.0" y1="58.0" x2="708.0" y2="58.0" stroke="#d49a3a" stroke-width="2.5"/>
+<text x="714.0" y="62.0" text-anchor="start" font-size="12" fill="#1d1d20">THD %</text>
+</svg>

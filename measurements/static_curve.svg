@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="840" height="560" viewBox="0 0 840 560" font-family="Helvetica,Arial,sans-serif">
+<rect width="840" height="560" fill="#ffffff"/>
+<text x="420" y="28" text-anchor="middle" font-size="19" font-weight="bold" fill="#1d1d20">Static compression curve (1 kHz, position 1)</text>
+<rect x="78.0" y="52.0" width="592.0" height="444.0" fill="none" stroke="#cccccc" stroke-width="1"/>
+<line x1="165.7" y1="52.0" x2="165.7" y2="496.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="165.7" y1="496.0" x2="165.7" y2="501.0" stroke="#888888" stroke-width="1"/>
+<text x="165.7" y="514.0" text-anchor="middle" font-size="12" fill="#444444">-40</text>
+<line x1="275.3" y1="52.0" x2="275.3" y2="496.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="275.3" y1="496.0" x2="275.3" y2="501.0" stroke="#888888" stroke-width="1"/>
+<text x="275.3" y="514.0" text-anchor="middle" font-size="12" fill="#444444">-30</text>
+<line x1="385.0" y1="52.0" x2="385.0" y2="496.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="385.0" y1="496.0" x2="385.0" y2="501.0" stroke="#888888" stroke-width="1"/>
+<text x="385.0" y="514.0" text-anchor="middle" font-size="12" fill="#444444">-20</text>
+<line x1="494.6" y1="52.0" x2="494.6" y2="496.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="494.6" y1="496.0" x2="494.6" y2="501.0" stroke="#888888" stroke-width="1"/>
+<text x="494.6" y="514.0" text-anchor="middle" font-size="12" fill="#444444">-10</text>
+<line x1="604.2" y1="52.0" x2="604.2" y2="496.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="604.2" y1="496.0" x2="604.2" y2="501.0" stroke="#888888" stroke-width="1"/>
+<text x="604.2" y="514.0" text-anchor="middle" font-size="12" fill="#444444">0</text>
+<line x1="78.0" y1="430.2" x2="670.0" y2="430.2" stroke="#eeeeee" stroke-width="1"/>
+<line x1="73.0" y1="430.2" x2="78.0" y2="430.2" stroke="#888888" stroke-width="1"/>
+<text x="69.0" y="434.2" text-anchor="end" font-size="12" fill="#444444">-40</text>
+<line x1="78.0" y1="348.0" x2="670.0" y2="348.0" stroke="#eeeeee" stroke-width="1"/>
+<line x1="73.0" y1="348.0" x2="78.0" y2="348.0" stroke="#888888" stroke-width="1"/>
+<text x="69.0" y="352.0" text-anchor="end" font-size="12" fill="#444444">-30</text>
+<line x1="78.0" y1="265.8" x2="670.0" y2="265.8" stroke="#eeeeee" stroke-width="1"/>
+<line x1="73.0" y1="265.8" x2="78.0" y2="265.8" stroke="#888888" stroke-width="1"/>
+<text x="69.0" y="269.8" text-anchor="end" font-size="12" fill="#444444">-20</text>
+<line x1="78.0" y1="183.6" x2="670.0" y2="183.6" stroke="#eeeeee" stroke-width="1"/>
+<line x1="73.0" y1="183.6" x2="78.0" y2="183.6" stroke="#888888" stroke-width="1"/>
+<text x="69.0" y="187.6" text-anchor="end" font-size="12" fill="#444444">-10</text>
+<line x1="78.0" y1="101.3" x2="670.0" y2="101.3" stroke="#eeeeee" stroke-width="1"/>
+<line x1="73.0" y1="101.3" x2="78.0" y2="101.3" stroke="#888888" stroke-width="1"/>
+<text x="69.0" y="105.3" text-anchor="end" font-size="12" fill="#444444">0</text>
+<text x="374.0" y="538.0" text-anchor="middle" font-size="13" fill="#1d1d20">Input level (dBFS)</text>
+<text x="22" y="274" text-anchor="middle" font-size="13" fill="#1d1d20" transform="rotate(-90 22 274)">Output level (dBFS)</text>
+<path d=" M78.0,496.0 L143.8,446.7 L209.6,397.3 L275.3,348.0 L341.1,298.7 L406.9,249.3 L472.7,200.0 L538.4,150.7 L604.2,101.3 L670.0,52.0" fill="none" stroke="#888888" stroke-width="2"/>
+<line x1="684.0" y1="58.0" x2="708.0" y2="58.0" stroke="#888888" stroke-width="2.5"/>
+<text x="714.0" y="62.0" text-anchor="start" font-size="12" fill="#1d1d20">Unity</text>
+<path d=" M78.0,496.0 L99.9,479.6 L121.9,463.2 L143.8,446.8 L165.7,430.4 L187.6,414.0 L209.6,397.6 L231.5,381.4 L253.4,365.1 L275.3,349.1 L297.3,333.1 L319.2,317.4 L341.1,302.1 L363.0,287.2 L385.0,272.9 L406.9,259.3 L428.8,246.4 L450.7,234.4 L472.7,223.3 L494.6,213.0 L516.5,203.4 L538.4,194.5 L560.4,186.3 L582.3,178.5 L604.2,171.2 L626.1,164.4 L648.1,157.9 L670.0,151.6" fill="none" stroke="#3a78c4" stroke-width="2"/>
+<line x1="684.0" y1="78.0" x2="708.0" y2="78.0" stroke="#3a78c4" stroke-width="2.5"/>
+<text x="714.0" y="82.0" text-anchor="start" font-size="12" fill="#1d1d20">Threshold 3</text>
+<path d=" M78.0,496.0 L99.9,479.7 L121.9,463.3 L143.8,447.0 L165.7,430.7 L187.6,414.5 L209.6,398.4 L231.5,382.5 L253.4,366.8 L275.3,351.4 L297.3,336.5 L319.2,322.2 L341.1,308.5 L363.0,295.7 L385.0,283.7 L406.9,272.5 L428.8,262.1 L450.7,252.5 L472.7,243.6 L494.6,235.3 L516.5,227.5 L538.4,220.2 L560.4,213.3 L582.3,206.8 L604.2,200.5 L626.1,194.6 L648.1,188.8 L670.0,183.3" fill="none" stroke="#d49a3a" stroke-width="2"/>
+<line x1="684.0" y1="98.0" x2="708.0" y2="98.0" stroke="#d49a3a" stroke-width="2.5"/>
+<text x="714.0" y="102.0" text-anchor="start" font-size="12" fill="#1d1d20">Threshold 5</text>
+<path d=" M78.0,496.0 L99.9,480.0 L121.9,463.8 L143.8,447.7 L165.7,431.8 L187.6,416.1 L209.6,400.7 L231.5,385.8 L253.4,371.5 L275.3,357.9 L297.3,345.0 L319.2,333.0 L341.1,321.8 L363.0,311.4 L385.0,301.8 L406.9,292.9 L428.8,284.6 L450.7,276.8 L472.7,269.5 L494.6,262.6 L516.5,256.0 L538.4,249.8 L560.4,243.8 L582.3,238.0 L604.2,232.5 L626.1,227.2 L648.1,222.0 L670.0,217.0" fill="none" stroke="#b03a2e" stroke-width="2"/>
+<line x1="684.0" y1="118.0" x2="708.0" y2="118.0" stroke="#b03a2e" stroke-width="2.5"/>
+<text x="714.0" y="122.0" text-anchor="start" font-size="12" fill="#1d1d20">Threshold 7</text>
+</svg>

@@ -163,6 +163,30 @@ void TekkChild670Processor::releaseResources()
 {
 }
 
+void TekkChild670Processor::reset()
+{
+    // Clear all running state (filters, feedback detector, delay line) without
+    // reallocating -- hosts call this on transport stop, and it gives the
+    // offline measurement harness an uncontaminated starting point per point.
+    for (auto& ch : channels)
+        ch.reset();
+
+    if (oversamplerIIR != nullptr) oversamplerIIR->reset();
+    if (oversamplerFIR != nullptr) oversamplerFIR->reset();
+    dryDelay.reset();
+
+    for (int ch = 0; ch < 2; ++ch)
+    {
+        inputGainSm[ch].setCurrentAndTargetValue (inputGainSm[ch].getTargetValue());
+        outputGainSm[ch].setCurrentAndTargetValue (outputGainSm[ch].getTargetValue());
+        mixSm[ch].setCurrentAndTargetValue (mixSm[ch].getTargetValue());
+        thresholdSm[ch].setCurrentAndTargetValue (thresholdSm[ch].getTargetValue());
+        biasSm[ch].setCurrentAndTargetValue (biasSm[ch].getTargetValue());
+        kneeSm[ch].setCurrentAndTargetValue (kneeSm[ch].getTargetValue());
+        grMeterDb[ch].store (0.0f);
+    }
+}
+
 bool TekkChild670Processor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
     const auto& in  = layouts.getMainInputChannelSet();
