@@ -49,9 +49,10 @@ jobs:
             https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Linux.zip
           unzip -o pluginval.zip -d pluginval-bin
           chmod +x pluginval-bin/pluginval
+          VST3=$(find build/TekkChild670_artefacts/Release/VST3 -maxdepth 1 -name "*.vst3" | head -1)
+          echo "Validating: $VST3"
           xvfb-run -a -s "-screen 0 1280x1024x24" pluginval-bin/pluginval \
-            --strictness-level 10 --validate \
-            "build/TekkChild670_artefacts/Release/VST3/TekkChild TA-670 MK2.vst3"
+            --strictness-level 10 --validate "$VST3"
 
       - name: Generate characterisation plots
         if: runner.os == 'Linux'
@@ -62,12 +63,12 @@ jobs:
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
-          name: TekkChild-TA-670-MK2-measurements
+          name: TekkChild-TC-670-measurements
           path: measurements/*.svg
 
       - name: Upload VST3
         uses: actions/upload-artifact@v4
         with:
-          name: TekkChild-TA-670-MK2-${{ runner.os }}-VST3
+          name: TekkChild-TC-670-${{ runner.os }}-VST3
           path: build/TekkChild670_artefacts/Release/VST3/
           if-no-files-found: error
