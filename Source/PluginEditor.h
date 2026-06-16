@@ -93,6 +93,34 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChannelStrip)
 };
 
+// Invisible hotspot over the mascot's nose: six clicks fire the easter egg.
+class NoseHotspot : public juce::Component
+{
+public:
+    NoseHotspot() { setInterceptsMouseClicks (true, false); }
+
+    std::function<void()> onSecretCombo;
+
+    void mouseDown (const juce::MouseEvent&) override
+    {
+        const auto now = juce::Time::getMillisecondCounter();
+        if (now - lastClickMs > 2500)
+            clicks = 0; // too slow -- start over
+        lastClickMs = now;
+
+        if (++clicks >= 6)
+        {
+            clicks = 0;
+            if (onSecretCombo)
+                onSecretCombo();
+        }
+    }
+
+private:
+    int clicks = 0;
+    juce::uint32 lastClickMs = 0;
+};
+
 } // namespace tekk
 
 //==============================================================================
@@ -130,7 +158,10 @@ private:
 
     juce::Image chassis;  // cached hammered-metal background
     juce::Image faceArt;  // central faceplate graphic
-    juce::Rectangle<int> faceArea;
+    juce::Rectangle<int> faceArea;       // the framed plate
+    juce::Rectangle<int> faceImageRect;  // where the artwork is drawn
+
+    tekk::NoseHotspot noseHotspot;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TekkChild670Editor)
 };

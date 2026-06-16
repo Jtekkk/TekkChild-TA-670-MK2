@@ -548,6 +548,9 @@ TekkChild670Editor::TekkChild670Editor (TekkChild670Processor& p)
     faceArt = juce::ImageCache::getFromMemory (BinaryData::tekkchild_face_png,
                                                BinaryData::tekkchild_face_pngSize);
 
+    noseHotspot.onSecretCombo = [this] { processor.triggerEasterEgg(); };
+    addAndMakeVisible (noseHotspot);
+
     refreshPresetBox();
     startTimerHz (8); // keep the box in step with host-driven program changes
 
@@ -598,15 +601,15 @@ void TekkChild670Editor::paint (juce::Graphics& g)
 
     g.setColour (juce::Colours::black.withAlpha (0.6f));
     g.setFont (juce::Font (juce::FontOptions (21.0f)).boldened());
-    g.drawText ("TEKKCHILD TA-670 MK2", header.reduced (40, 0).translated (0, 1),
+    g.drawText ("TEKKCHILD TC-670", header.reduced (40, 0).translated (0, 1),
                 juce::Justification::centredLeft);
     g.setColour (tekk::colours::cream);
-    g.drawText ("TEKKCHILD TA-670 MK2", header.reduced (40, 0),
+    g.drawText ("TEKKCHILD TC-670", header.reduced (40, 0),
                 juce::Justification::centredLeft);
 
     g.setColour (tekk::colours::amber);
     g.setFont (juce::Font (juce::FontOptions (11.0f)));
-    g.drawText ("TEKK AUDIO ENGINEERING  ·  VARIABLE-MU TUBE COMPRESSOR",
+    g.drawText ("TEKK ENGINEERING AUDIO LABS  ·  VARI-MU COMPRESSOR",
                 header.reduced (74, 0), juce::Justification::centredRight);
 
     g.setColour (juce::Colour (0xff141416));
@@ -649,16 +652,17 @@ void TekkChild670Editor::paint (juce::Graphics& g)
                                                  juce::Colours::transparentBlack, win.getCentreX(), win.getY(), true));
         g.fillRoundedRectangle (win, 6.0f);
 
-        if (faceArt.isValid())
+        if (faceArt.isValid() && ! faceImageRect.isEmpty())
         {
             juce::Graphics::ScopedSaveState ss (g);
             juce::Path clip;
             clip.addRoundedRectangle (win.reduced (2.0f), 5.0f);
             g.reduceClipRegion (clip);
 
-            const auto iw = win.reduced (2.0f).toNearestInt();
-            g.drawImageWithin (faceArt, iw.getX(), iw.getY(), iw.getWidth(), iw.getHeight(),
-                               juce::RectanglePlacement::fillDestination);
+            // whole artwork, fit (not cropped), so the full face is shown
+            g.drawImageWithin (faceArt, faceImageRect.getX(), faceImageRect.getY(),
+                               faceImageRect.getWidth(), faceImageRect.getHeight(),
+                               juce::RectanglePlacement::centred);
         }
 
         // glass sheen across the top
@@ -670,11 +674,11 @@ void TekkChild670Editor::paint (juce::Graphics& g)
         g.drawRoundedRectangle (win, 6.0f, 1.2f);
 
         // engraved nameplate
-        g.setFont (juce::Font (juce::FontOptions (13.0f)).boldened());
+        g.setFont (juce::Font (juce::FontOptions (14.0f)).boldened());
         g.setColour (juce::Colours::black.withAlpha (0.6f));
-        g.drawText ("TEKKCHILD", label.translated (0.0f, 1.0f), juce::Justification::centred);
+        g.drawText ("TEAL", label.translated (0.0f, 1.0f), juce::Justification::centred);
         g.setColour (tekk::colours::amber);
-        g.drawText ("TEKKCHILD", label, juce::Justification::centred);
+        g.drawText ("TEAL", label, juce::Justification::centred);
 
         // corner screws on the plate
         const float ins = 12.0f;
@@ -702,11 +706,28 @@ void TekkChild670Editor::resized()
     auto footer = r.removeFromBottom (52).reduced (14, 10);
 
     auto body = r.reduced (12, 6);
-    const int colW  = 176;
+    const int colW  = 208;
     const int sideW = (body.getWidth() - colW) / 2;
     stripA.setBounds (body.removeFromLeft (sideW).reduced (4, 0));
     faceArea = body.removeFromLeft (colW).reduced (6, 2);
     stripB.setBounds (body.reduced (4, 0));
+
+    // mirror the faceplate maths in paint() to locate the artwork, then the nose
+    {
+        auto win = faceArea.toFloat().reduced (10.0f);
+        win.removeFromBottom (22.0f + 4.0f); // nameplate strip
+        auto inner = win.reduced (2.0f);
+
+        const float side = juce::jmin (inner.getWidth(), inner.getHeight());
+        faceImageRect = juce::Rectangle<float> (side, side)
+                            .withCentre (inner.getCentre()).toNearestInt();
+
+        // the mascot's nose sits a little above centre
+        const float ns = side * 0.26f;
+        noseHotspot.setBounds (juce::Rectangle<float> (ns, ns)
+            .withCentre ({ (float) faceImageRect.getCentreX(),
+                           faceImageRect.getY() + side * 0.42f }).toNearestInt());
+    }
 
     modeLb.setBounds (footer.removeFromLeft (44));
     modeBox.setBounds (footer.removeFromLeft (130));

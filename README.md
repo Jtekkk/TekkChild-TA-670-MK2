@@ -1,6 +1,6 @@
 # Tekk.Engineering.Audio.Labs TEAL - TekkChild TC-670 Vari-Mu Compressor
 
-The TekkChild TA-670 MK2 is our revolutionary VST plugin that brings the most
+The TekkChild TC-670 is our revolutionary VST plugin that brings the most
 iconic and finest sounding tube compressor in history to your DAW.
 Painstakingly modeled by our small team of DSP engineers, the TekkChild is a
 recreation of a Fairchild 670 with added modern features for today's
@@ -35,7 +35,7 @@ that makes the original so special.
 
 ## The Circuit and Controls
 
-The TA-670 adds several modern features for modern-day productions.
+The TC-670 adds several modern features for modern-day productions.
 DC Threshold, sidechain High Pass Filter, Dry/Wet blend control and Output
 trim are available on each channel, alongside a true bypass switch and a
 Purist mode that takes the modern blend controls out of circuit entirely.
@@ -137,7 +137,7 @@ built alongside; AU is produced on macOS.
 CMakeLists.txt              JUCE 8 CMake project (VST3 / AU / Standalone + test app)
 Source/
   PluginProcessor.*         parameter layout, routing, oversampling, dry/wet, presets
-  PluginEditor.*            hardware-styled UI: GR needles, I/O meters, preset bar
+  PluginEditor.*            hardware-styled UI: hammered chassis, backlit meters, faceplate
   Parameters.h              parameter IDs
   Presets.h                 factory preset definitions
   DSP/
@@ -147,6 +147,7 @@ Source/
     TubeStage.h             push-pull tube nonlinearity
     TransformerModel.h      LF-weighted core saturation, band edges
     SidechainFilter.h       TPT high-pass on the detector
+Resources/                  embedded assets (faceplate art + audio), via juce_add_binary_data
 Tests/
   SmokeTest.cpp             engine + anti-click contract tests, run in CI
 .github/workflows/build.yml CI: Linux/macOS/Windows build + tests + pluginval + artifacts
@@ -202,12 +203,12 @@ measurements taken from reference hardware units.
 
 ## Licensing
 
-The TekkChild TA-670 MK2 is a commercial product of Tekk Audio Engineering.
+The TekkChild TC-670 is a commercial product of Tekk Engineering Audio Labs.
 This source builds against [JUCE](https://juce.com), which is dual-licensed
 (AGPLv3 / commercial) -- distribution of binaries must comply with the JUCE
 license held by the company.
 
 ---
 
-*If you don't love your TekkChild TA-670 MK2, we'll refund you -- every
+*If you don't love your TekkChild TC-670, we'll refund you -- every
 purchase comes with a 30-day money back guarantee.*

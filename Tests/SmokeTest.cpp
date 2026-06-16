@@ -457,6 +457,26 @@ int main()
                     + std::to_string (purist->getValue()) + ")");
     }
 
+    // -- Easter egg ----------------------------------------------------------
+    {
+        // Triggering it decodes the embedded clip and mixes it into the output.
+        setParam (proc, "bypass", 0.0f);
+        proc.triggerEasterEgg();
+
+        juce::MidiBuffer midi;
+        float peak = 0.0f;
+        for (int blk = 0; blk < 120; ++blk) // ~1.3 s of silent input
+        {
+            buffer.clear();
+            proc.processBlock (buffer, midi);
+            peak = std::max (peak, buffer.getMagnitude (0, 0, blockSize));
+        }
+
+        expect (peak > 0.001f,
+                "easter egg plays the embedded clip into silent output (peak "
+                    + std::to_string (peak) + ")");
+    }
+
     std::cout << "\n" << (failures == 0 ? "ALL TESTS PASSED" : "TESTS FAILED")
               << std::endl;
 

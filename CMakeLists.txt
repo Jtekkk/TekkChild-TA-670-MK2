@@ -15,8 +15,10 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(JUCE)
 
-# Embedded artwork (the central faceplate graphic)
-juce_add_binary_data(TekkChildArt SOURCES Resources/tekkchild_face.png)
+# Embedded assets (central faceplate graphic + easter-egg audio)
+juce_add_binary_data(TekkChildArt SOURCES
+    Resources/tekkchild_face.png
+    Resources/easter_egg.ogg)
 
 set(TEKK_FORMATS VST3 Standalone)
 if(APPLE)
@@ -24,11 +26,11 @@ if(APPLE)
 endif()
 
 juce_add_plugin(TekkChild670
-    PRODUCT_NAME              "TekkChild TA-670 MK2"
-    COMPANY_NAME              "Tekk Audio Engineering"
-    BUNDLE_ID                 com.tekkaudio.tekkchild670
-    PLUGIN_MANUFACTURER_CODE  Tekk
-    PLUGIN_CODE               Tk67
+    PRODUCT_NAME              "TekkChild TC-670 Vari-Mu Compressor"
+    COMPANY_NAME              "Tekk Engineering Audio Labs"
+    BUNDLE_ID                 com.teal.tekkchildtc670
+    PLUGIN_MANUFACTURER_CODE  Teal
+    PLUGIN_CODE               Tc67
     FORMATS                   ${TEKK_FORMATS}
     IS_SYNTH                  FALSE
     NEEDS_MIDI_INPUT          FALSE

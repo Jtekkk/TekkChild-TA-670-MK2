@@ -1,5 +1,8 @@
 #include "PluginProcessor.h"
 
+#include <BinaryData.h>
+#include <juce_audio_formats/juce_audio_formats.h>
+
 #include "Parameters.h"
 #include "PluginEditor.h"
 #include "Presets.h"
@@ -158,10 +161,71 @@ void TekkChild670Processor::prepareToPlay (double sampleRate, int samplesPerBloc
 
     activeQuality = -1;
     applyQualityMode ((int) pQuality->load(), true);
+
+    // the easter-egg clip is resampled to the host rate, so invalidate it here
+    eggArm.store (false);
+    eggActive = false;
+    eggPos    = 0;
+    eggLoaded = false;
+    eggBuffer.setSize (2, 0);
 }
 
 void TekkChild670Processor::releaseResources()
 {
+}
+
+//==============================================================================
+void TekkChild670Processor::loadEasterEgg()
+{
+    juce::AudioFormatManager fm;
+    fm.registerBasicFormats();
+    fm.registerFormat (new juce::OggVorbisAudioFormat(), false);
+
+    auto stream = std::make_unique<juce::MemoryInputStream> (
+        BinaryData::easter_egg_ogg, (size_t) BinaryData::easter_egg_oggSize, false);
+
+    std::unique_ptr<juce::AudioFormatReader> reader (fm.createReaderFor (std::move (stream)));
+    eggLoaded = true; // even on failure, don't retry every click
+
+    if (reader == nullptr || reader->lengthInSamples <= 0)
+        return;
+
+    const int fileLen = (int) reader->lengthInSamples;
+    const int fileCh  = juce::jmax (1, (int) reader->numChannels);
+
+    juce::AudioBuffer<float> fileBuf (fileCh, fileLen + 16);
+    fileBuf.clear();
+    reader->read (&fileBuf, 0, fileLen, 0, true, fileCh > 1);
+
+    const double ratio = reader->sampleRate / baseSampleRate; // in-samples per out-sample
+    const int outLen = (int) ((double) fileLen / ratio);
+    if (outLen <= 0)
+        return;
+
+    eggBuffer.setSize (2, outLen);
+    eggBuffer.clear();
+
+    for (int ch = 0; ch < 2; ++ch)
+    {
+        const float* src = fileBuf.getReadPointer (juce::jmin (ch, fileCh - 1));
+
+        if (std::abs (ratio - 1.0) < 1.0e-9)
+            eggBuffer.copyFrom (ch, 0, src, juce::jmin (outLen, fileLen));
+        else
+        {
+            juce::LagrangeInterpolator interp;
+            interp.process (ratio, src, eggBuffer.getWritePointer (ch), outLen);
+        }
+    }
+}
+
+void TekkChild670Processor::triggerEasterEgg()
+{
+    if (! eggLoaded)
+        loadEasterEgg();
+
+    if (eggBuffer.getNumSamples() > 0)
+        eggArm.store (true); // picked up at the next audio block
 }
 
 void TekkChild670Processor::reset()
@@ -448,6 +512,29 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
 
     grMeterDb[0].store (maxGr[0]);
     grMeterDb[1].store (numCh > 1 ? maxGr[1] : maxGr[0]);
+
+    // easter egg: mix the embedded clip on top of the output once armed
+    if (eggArm.exchange (false))
+    {
+        eggActive = true;
+        eggPos    = 0;
+    }
+    if (eggActive && eggBuffer.getNumSamples() > 0)
+    {
+        const int eggLen = eggBuffer.getNumSamples();
+        const int count  = juce::jmin (n, eggLen - eggPos);
+
+        for (int ch = 0; ch < numCh; ++ch)
+            buffer.addFrom (ch, 0, eggBuffer, juce::jmin (ch, eggBuffer.getNumChannels() - 1),
+                            eggPos, count, 0.9f);
+
+        eggPos += count;
+        if (eggPos >= eggLen)
+        {
+            eggActive = false;
+            eggPos    = 0;
+        }
+    }
 
     for (int ch = 0; ch < numCh; ++ch)
         outMeterDb[ch].store (juce::Decibels::gainToDecibels (buffer.getMagnitude (ch, 0, n), -100.0f));

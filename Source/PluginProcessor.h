@@ -23,7 +23,7 @@ public:
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
 
-    const juce::String getName() const override { return "TekkChild TA-670 MK2"; }
+    const juce::String getName() const override { return "TekkChild TC-670 Vari-Mu Compressor"; }
 
     bool acceptsMidi() const override   { return false; }
     bool producesMidi() const override  { return false; }
@@ -58,10 +58,16 @@ public:
         return outMeterDb[clampCh (channel)].load();
     }
 
+    // Hidden easter egg: the editor calls this (from the message thread) when
+    // the mascot's nose is clicked six times; it plays the embedded clip once.
+    void triggerEasterEgg();
+
     juce::AudioProcessorValueTreeState apvts;
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+
+    void loadEasterEgg(); // decode + resample the embedded clip to the host rate
 
     // reportLatencyNow is true only when called from prepareToPlay (message
     // thread); from the audio thread we defer setLatencySamples to handleAsyncUpdate.
@@ -90,6 +96,14 @@ private:
     std::atomic<float> grMeterDb[2] { 0.0f, 0.0f };
     std::atomic<float> inMeterDb[2] { -100.0f, -100.0f };
     std::atomic<float> outMeterDb[2] { -100.0f, -100.0f };
+
+    // easter-egg playback: clip decoded once (message thread), mixed into the
+    // output (audio thread) when armed
+    juce::AudioBuffer<float> eggBuffer;
+    bool eggLoaded = false;
+    std::atomic<bool> eggArm { false };
+    bool eggActive = false;
+    int  eggPos = 0;
 
     int currentProgram = 0;
 
