@@ -640,9 +640,9 @@ void TekkChild670Editor::paint (juce::Graphics& g)
         g.setColour (juce::Colour (0xff141416));
         g.drawRoundedRectangle (fa, 9.0f, 1.4f);
 
-        auto win   = fa.reduced (10.0f);
-        auto label = win.removeFromBottom (22.0f); // engraved nameplate strip
-        win.removeFromBottom (4.0f);
+        auto win   = fa.reduced (8.0f);
+        auto label = win.removeFromBottom (20.0f); // engraved nameplate strip
+        win.removeFromBottom (3.0f);
 
         tekk::drawRecess (g, win, 6.0f);
 
@@ -706,16 +706,20 @@ void TekkChild670Editor::resized()
     auto footer = r.removeFromBottom (52).reduced (14, 10);
 
     auto body = r.reduced (12, 6);
-    const int colW  = 208;
+    const int colW  = 280;
     const int sideW = (body.getWidth() - colW) / 2;
     stripA.setBounds (body.removeFromLeft (sideW).reduced (4, 0));
-    faceArea = body.removeFromLeft (colW).reduced (6, 2);
+    auto column = body.removeFromLeft (colW);
     stripB.setBounds (body.reduced (4, 0));
+
+    // square faceplate, centred vertically so the face fills its frame
+    const int plateH = juce::jmin (column.getHeight(), colW + 22);
+    faceArea = column.withSizeKeepingCentre (colW, plateH).reduced (4, 2);
 
     // mirror the faceplate maths in paint() to locate the artwork, then the nose
     {
-        auto win = faceArea.toFloat().reduced (10.0f);
-        win.removeFromBottom (22.0f + 4.0f); // nameplate strip
+        auto win = faceArea.toFloat().reduced (8.0f);
+        win.removeFromBottom (20.0f + 3.0f); // nameplate strip
         auto inner = win.reduced (2.0f);
 
         const float side = juce::jmin (inner.getWidth(), inner.getHeight());
