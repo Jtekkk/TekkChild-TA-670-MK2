@@ -172,7 +172,7 @@ installer/                  branded NSIS Windows installer (mascot art + audio t
 A branded NSIS installer (`installer/TekkChild-TC-670.nsi`) packages the
 Windows VST3 into a wizard with the mascot icon and wizard artwork, installs
 the plugin to the shared `Common Files\VST3` folder with an Add/Remove
-Programs entry and uninstaller, and bundles the TEKK Engineering audio track.
+Programs entry and uninstaller, and bundles the TEKK Engineering audio track (which also plays during the install).
 CI builds it on the Windows runner (`makensis`) once the VST3 is compiled and
 uploads it as the `TekkChild-TC-670-Windows-Installer` artifact. The script
 also test-compiles on Linux (`makensis`) so the packaging is checked on every

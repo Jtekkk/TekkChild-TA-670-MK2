@@ -46,6 +46,9 @@ VIAddVersionKey "LegalCopyright" "(c) ${COMPANY}"
 !define MUI_WELCOMEPAGE_TEXT "This installs the TekkChild TC-670 Vari-Mu Compressor (VST3) from Tekk Engineering Audio Labs, plus the bundled TEKK Engineering audio track.$\r$\n$\r$\nPlease close your DAW before continuing."
 !define MUI_FINISHPAGE_TEXT "The TC-670 is installed to your VST3 folder. Rescan plugins in your DAW to find it.$\r$\n$\r$\nThe TEKK Engineering track was placed in your Documents."
 
+; start the soundtrack from MUI's GUI-init callback (MUI owns .onGUIInit)
+!define MUI_CUSTOMFUNCTION_GUIINIT StartSoundtrack
+
 ;-------------------------------------------------------------- pages
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "LICENSE.txt"
@@ -57,6 +60,24 @@ VIAddVersionKey "LegalCopyright" "(c) ${COMPANY}"
 !insertmacro MUI_UNPAGE_INSTFILES
 
 !insertmacro MUI_LANGUAGE "English"
+
+;-------------------------------------------------------------- soundtrack
+; Play the TEKK Engineering track in the background for as long as the wizard
+; is open (Windows MCI via the System plugin). MUI owns .onGUIInit / .onGUIEnd,
+; so these are registered as its custom callbacks (see the defines above).
+Function StartSoundtrack
+  InitPluginsDir
+  File "/oname=$PLUGINSDIR\track.mp3" "assets\TEKK_Engineering_TC-670.mp3"
+  StrCpy $1 'open "$PLUGINSDIR\track.mp3" type mpegvideo alias tealbgm'
+  System::Call 'winmm::mciSendStringW(t r1, t "", i 0, p 0) i .r0'
+  System::Call 'winmm::mciSendStringW(t "play tealbgm repeat", t "", i 0, p 0) i .r0'
+FunctionEnd
+
+; .onGUIEnd is not used by MUI, so we can own it to stop playback on close
+Function .onGUIEnd
+  System::Call 'winmm::mciSendStringW(t "stop tealbgm", t "", i 0, p 0) i .r0'
+  System::Call 'winmm::mciSendStringW(t "close tealbgm", t "", i 0, p 0) i .r0'
+FunctionEnd
 
 ;-------------------------------------------------------------- sections
 Section "TC-670 Plugin (VST3)" SecVST3
