@@ -1,0 +1,25 @@
+TekkChild TC-670 Vari-Mu Compressor
+Tekk Engineering Audio Labs (TEAL)
+
+END USER LICENSE AGREEMENT
+
+This software is a commercial product of Tekk Engineering Audio Labs. By
+installing it you agree to use it in accordance with the licence granted with
+your purchase. You may install it on the computers covered by your licence for
+your own music production.
+
+You may not redistribute, resell, rent, or reverse-engineer the plugin.
+
+The plugin is built with the JUCE framework (https://juce.com), which is
+dual-licensed (AGPLv3 / commercial); distribution of the binaries is governed
+by the JUCE licence held by Tekk Engineering Audio Labs.
+
+The bundled "TEKK Engineering" audio track is provided for your enjoyment and
+use in your own productions.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. To the maximum
+extent permitted by law, Tekk Engineering Audio Labs shall not be liable for
+any damages arising from the use of this software.
+
+If you don't love your TekkChild TC-670, contact support for a refund within
+the guarantee period.

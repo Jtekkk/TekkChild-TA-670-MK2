@@ -72,3 +72,25 @@ jobs:
           name: TekkChild-TC-670-${{ runner.os }}-VST3
           path: build/TekkChild670_artefacts/Release/VST3/
           if-no-files-found: error
+
+      # Branded NSIS installer (mascot icon + wizard art, bundles the audio track)
+      - name: Build Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          $vst3 = (Get-ChildItem "build/TekkChild670_artefacts/Release/VST3" -Filter *.vst3 -Directory |
+                   Select-Object -First 1).FullName -replace '\\','/'
+          Write-Host "Packaging VST3: $vst3"
+          Push-Location installer
+          & "C:\Program Files (x86)\NSIS\makensis.exe" "/DVST3SRC=$vst3" "/DVERSION=2.0.0" TekkChild-TC-670.nsi
+          if ($LASTEXITCODE -ne 0) { throw "makensis failed ($LASTEXITCODE)" }
+          Pop-Location
+
+      - name: Upload Windows installer
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: TekkChild-TC-670-Windows-Installer
+          path: installer/*.exe
+          if-no-files-found: error

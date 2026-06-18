@@ -163,8 +163,20 @@ Source/
 Resources/                  embedded assets (faceplate art + audio), via juce_add_binary_data
 Tests/
   SmokeTest.cpp             engine + anti-click contract tests, run in CI
+installer/                  branded NSIS Windows installer (mascot art + audio track)
 .github/workflows/build.yml CI: Linux/macOS/Windows build + tests + pluginval + artifacts
 ```
+
+## Windows installer
+
+A branded NSIS installer (`installer/TekkChild-TC-670.nsi`) packages the
+Windows VST3 into a wizard with the mascot icon and wizard artwork, installs
+the plugin to the shared `Common Files\VST3` folder with an Add/Remove
+Programs entry and uninstaller, and bundles the TEKK Engineering audio track.
+CI builds it on the Windows runner (`makensis`) once the VST3 is compiled and
+uploads it as the `TekkChild-TC-670-Windows-Installer` artifact. The script
+also test-compiles on Linux (`makensis`) so the packaging is checked on every
+build.
 
 ## Validation & robustness
 
