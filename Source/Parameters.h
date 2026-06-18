@@ -23,6 +23,8 @@ inline constexpr const char* drive    = "drive";   // tube + transformer saturat
 inline constexpr const char* tubeType = "tubetype";// rolled valve type
 inline constexpr const char* tubeBias = "tubebias";// grid bias / operating point
 inline constexpr const char* tubeVolt = "tubevolt";// plate voltage / headroom
+inline constexpr const char* autoMakeup = "automakeup"; // auto makeup gain
+inline constexpr const char* safety     = "safety";     // output soft-clip ceiling
 inline constexpr const char* purist   = "purist";  // takes the MK2 additions out of circuit
 inline constexpr const char* bypass   = "bypass";  // true bypass
 

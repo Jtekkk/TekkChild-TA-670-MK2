@@ -128,12 +128,27 @@ private:
     std::atomic<float>* pTubeType {};
     std::atomic<float>* pTubeBias {};
     std::atomic<float>* pTubeVolt {};
+    std::atomic<float>* pAutoMk {};
+    std::atomic<float>* pSafety {};
     std::atomic<float>* pPurist {};
 
     float characterCurrent = 1.0f; // smoothed tube/transformer drive scaler
 
     // smoothed tube-roll coefficients (glide between valve types / bias / voltage)
     float tubeMuCur = 1.0f, tubeAsymCur = 0.035f, tubeHeadCur = 1.0f, tubeBiasCur = 0.0f;
+
+    // auto-makeup: slow per-channel estimate of the gain reduction to add back
+    float makeupGrDb[2] { 0.0f, 0.0f };
+
+    // gentle output ceiling, linear below the knee then asymptotic to ~0 dBFS
+    static float safetyClip (float x) noexcept
+    {
+        constexpr float t = 0.65f, c = 0.985f;
+        const float a = std::abs (x);
+        if (a <= t)
+            return x;
+        return (x < 0.0f ? -1.0f : 1.0f) * (t + (c - t) * std::tanh ((a - t) / (c - t)));
+    }
 
     juce::AudioParameterBool* bypassParam = nullptr;
 

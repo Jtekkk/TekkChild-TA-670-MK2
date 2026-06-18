@@ -78,7 +78,7 @@ inline const std::vector<Preset>& factoryPresets()
         { "Brick Limiter",
           { { pid::threshold, 10.0f }, { pid::timeConstant, 0.0f }, { pid::scHpf, 0.0f },
             { pid::mix, 100.0f }, { pid::output, 0.0f }, { pid::compIn, 1.0f } },
-          { { pid::mode, 2.0f }, { pid::quality, 2.0f } } },
+          { { pid::mode, 2.0f }, { pid::quality, 2.0f }, { pid::safety, 1.0f } } },
 
         { "Clean Color",
           { { pid::input, 3.0f }, { pid::threshold, 5.0f }, { pid::mix, 100.0f },

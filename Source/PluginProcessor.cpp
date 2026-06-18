@@ -47,6 +47,8 @@ TekkChild670Processor::TekkChild670Processor()
     pTubeType = apvts.getRawParameterValue (pid::tubeType);
     pTubeBias = apvts.getRawParameterValue (pid::tubeBias);
     pTubeVolt = apvts.getRawParameterValue (pid::tubeVolt);
+    pAutoMk   = apvts.getRawParameterValue (pid::autoMakeup);
+    pSafety   = apvts.getRawParameterValue (pid::safety);
     pPurist   = apvts.getRawParameterValue (pid::purist);
 
     bypassParam = dynamic_cast<juce::AudioParameterBool*> (apvts.getParameter (pid::bypass));
@@ -140,6 +142,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout TekkChild670Processor::creat
         j::ParameterID (pid::tubeVolt, 1), "Plate Voltage",
         j::NormalisableRange<float> (150.0f, 350.0f, 1.0f), 250.0f,
         j::AudioParameterFloatAttributes().withLabel ("V")));
+
+    layout.add (std::make_unique<j::AudioParameterBool> (
+        j::ParameterID (pid::autoMakeup, 1), "Auto Gain", false));
+
+    layout.add (std::make_unique<j::AudioParameterBool> (
+        j::ParameterID (pid::safety, 1), "Safety Clip", false));
 
     layout.add (std::make_unique<j::AudioParameterBool> (
         j::ParameterID (pid::purist, 1), "Purist Mode", false));
@@ -273,6 +281,7 @@ void TekkChild670Processor::reset()
         biasSm[ch].setCurrentAndTargetValue (biasSm[ch].getTargetValue());
         kneeSm[ch].setCurrentAndTargetValue (kneeSm[ch].getTargetValue());
         grMeterDb[ch].store (0.0f);
+        makeupGrDb[ch] = 0.0f;
     }
 }
 
@@ -491,7 +500,8 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
     float* d0 = osBlock.getChannelPointer (0);
     float* d1 = numCh > 1 ? osBlock.getChannelPointer (1) : nullptr;
 
-    float maxGr[2] = { 0.0f, 0.0f };
+    float  maxGr[2] = { 0.0f, 0.0f };
+    double sumGr[2] = { 0.0, 0.0 };
 
     for (int i = 0; i < osN; ++i)
     {
@@ -510,12 +520,29 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
             if (linked)
                 cv0 = cv1 = juce::jmax (cv0, cv1);
 
-            d1[i]    = channels[1].renderWithControlVoltage (cv1);
-            maxGr[1] = juce::jmax (maxGr[1], channels[1].currentGainReductionDb());
+            d1[i]      = channels[1].renderWithControlVoltage (cv1);
+            const float gr1 = channels[1].currentGainReductionDb();
+            maxGr[1]   = juce::jmax (maxGr[1], gr1);
+            sumGr[1]  += gr1;
         }
 
-        d0[i]    = channels[0].renderWithControlVoltage (cv0);
-        maxGr[0] = juce::jmax (maxGr[0], channels[0].currentGainReductionDb());
+        d0[i]      = channels[0].renderWithControlVoltage (cv0);
+        const float gr0 = channels[0].currentGainReductionDb();
+        maxGr[0]   = juce::jmax (maxGr[0], gr0);
+        sumGr[0]  += gr0;
+    }
+
+    // Auto makeup: slowly track the average gain reduction so it can be added
+    // back at the output, holding level for sustained material while leaving
+    // transient dynamics intact.
+    const bool  autoMk    = pAutoMk->load() > 0.5f;
+    const float grAvgCoef = 1.0f - std::exp (-(float) n / (1.0f * (float) baseSampleRate)); // ~1 s
+    float makeupLin[2] = { 1.0f, 1.0f };
+    for (int ch = 0; ch < numCh; ++ch)
+    {
+        const float avgGr = (float) (sumGr[ch] / juce::jmax (1, osN));
+        makeupGrDb[ch] += grAvgCoef * (avgGr - makeupGrDb[ch]);
+        makeupLin[ch]   = autoMk ? juce::Decibels::decibelsToGain (makeupGrDb[ch]) : 1.0f;
     }
 
     if (oversampler != nullptr)
@@ -535,11 +562,12 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
         }
     }
 
-    // blend with the latency-aligned dry signal, then the output trim
+    // blend with the latency-aligned dry signal, then the output trim + makeup
     for (int ch = 0; ch < numCh; ++ch)
     {
         auto* wet       = buffer.getWritePointer (ch);
         const auto* dry = dryBuffer.getReadPointer (ch);
+        const float mk  = makeupLin[ch];
 
         for (int i = 0; i < n; ++i)
         {
@@ -554,7 +582,7 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
             const float mixAmt  = mixSm[ch].getNextValue();
             const float outGain = outputGainSm[ch].getNextValue();
 
-            wet[i] = outGain * (mixAmt * wet[i] + (1.0f - mixAmt) * drySample);
+            wet[i] = mk * outGain * (mixAmt * wet[i] + (1.0f - mixAmt) * drySample);
         }
     }
 
@@ -583,6 +611,15 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
             eggPos    = 0;
         }
     }
+
+    // Safety: a gentle final ceiling so heavy Drive / saturation can't push overs
+    if (pSafety->load() > 0.5f)
+        for (int ch = 0; ch < numCh; ++ch)
+        {
+            auto* w = buffer.getWritePointer (ch);
+            for (int i = 0; i < n; ++i)
+                w[i] = safetyClip (w[i]);
+        }
 
     for (int ch = 0; ch < numCh; ++ch)
         outMeterDb[ch].store (juce::Decibels::gainToDecibels (buffer.getMagnitude (ch, 0, n), -100.0f));

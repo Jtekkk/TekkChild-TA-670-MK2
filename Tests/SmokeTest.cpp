@@ -554,6 +554,60 @@ int main()
         setParam (proc, "drive", 50.0f);
     }
 
+    // -- Output tools: auto makeup + safety clip -----------------------------
+    {
+        // Auto Gain adds the average gain reduction back, raising the output.
+        setParam (proc, "bypass", 0.0f);
+        setParam (proc, "mode", 0.0f);
+        setParam (proc, "quality", 0.0f);
+        setParam (proc, "safety", 0.0f);
+        setParam (proc, "compinA", 1.0f);
+        setParam (proc, "inputA", 6.0f);
+        setParam (proc, "thresholdA", 8.0f); // heavy, steady gain reduction
+
+        auto outRmsWithMakeup = [&] (float on)
+        {
+            setParam (proc, "automakeup", on);
+            proc.reset();
+            runSine (proc, buffer, 0.5f, 3.0, 220.0, fs);             // build the slow makeup
+            return runSine (proc, buffer, 0.5f, 0.5, 220.0, fs).outRmsDb;
+        };
+
+        const float mkOff = outRmsWithMakeup (0.0f);
+        const float mkOn  = outRmsWithMakeup (1.0f);
+        expect (mkOn > mkOff + 3.0f,
+                "Auto Gain restores level (" + std::to_string (mkOff) + " -> "
+                    + std::to_string (mkOn) + " dB)");
+
+        setParam (proc, "automakeup", 0.0f);
+        setParam (proc, "compinA", 0.0f);
+        setParam (proc, "inputA", 0.0f);
+    }
+
+    {
+        // Safety clip holds the output at/under ~0 dBFS even when driven over.
+        setParam (proc, "automakeup", 0.0f);
+        setParam (proc, "compinA", 0.0f);
+        setParam (proc, "inputA", 0.0f);
+        setParam (proc, "drive", 50.0f);
+        setParam (proc, "outputA", 12.0f); // push the output well over 0 dBFS
+
+        setParam (proc, "safety", 0.0f);
+        const float pkOff = runSine (proc, buffer, 0.5f, 0.2, 220.0, fs).peak;
+
+        setParam (proc, "safety", 1.0f);
+        runSine (proc, buffer, 0.5f, 0.1, 220.0, fs);
+        const float pkOn = runSine (proc, buffer, 0.5f, 0.2, 220.0, fs).peak;
+
+        expect (pkOff > 1.0f, "output exceeds 0 dBFS without Safety (peak "
+                                  + std::to_string (pkOff) + ")");
+        expect (pkOn <= 1.0f, "Safety holds the output at/under 0 dBFS (peak "
+                                  + std::to_string (pkOn) + ")");
+
+        setParam (proc, "safety", 0.0f);
+        setParam (proc, "outputA", 0.0f);
+    }
+
     std::cout << "\n" << (failures == 0 ? "ALL TESTS PASSED" : "TESTS FAILED")
               << std::endl;
 

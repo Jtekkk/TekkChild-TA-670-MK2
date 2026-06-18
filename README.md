@@ -79,6 +79,11 @@ cleaner). Swapping any of these glides over ~100 ms so there are no clicks.
 Other global controls: Channel Mode (Left/Right, Lat/Vert (M/S), L/R
 Linked), Engine (Eco / Zero Latency / Studio), Purist Mode, True Bypass.
 
+Output tools: **Auto Gain** (tracks the average gain reduction and adds it
+back at the output, holding level for sustained material while leaving
+transient dynamics intact) and **Safety** (a gentle output ceiling that
+catches peaks heavy Drive / saturation can push over 0 dBFS).
+
 Each channel strip shows a VU gain-reduction needle flanked by input and
 output level meters (dBFS, with peak hold).
 

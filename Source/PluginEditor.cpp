@@ -524,6 +524,15 @@ TekkChild670Editor::TekkChild670Editor (TekkChild670Processor& p)
     bypassAt = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         processor.apvts, tekk::pid::bypass, bypassBtn);
 
+    autoGainBtn.setTooltip ("Auto Gain - adds the average gain reduction back at the output to hold level");
+    safetyBtn.setTooltip ("Safety - gentle output ceiling that catches peaks from heavy Drive / saturation");
+    addAndMakeVisible (autoGainBtn);
+    addAndMakeVisible (safetyBtn);
+    autoGainAt = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
+        processor.apvts, tekk::pid::autoMakeup, autoGainBtn);
+    safetyAt = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
+        processor.apvts, tekk::pid::safety, safetyBtn);
+
     // -- TUBE section: type selector above the mascot, DRIVE / BIAS / VOLTAGE
     //    knobs below it --
     auto setupTubeKnob = [this] (juce::Slider& s, juce::Label& l, const juce::String& name,
@@ -802,10 +811,13 @@ void TekkChild670Editor::resized()
 
     modeLb.setBounds (footer.removeFromLeft (44));
     modeBox.setBounds (footer.removeFromLeft (130));
-    footer.removeFromLeft (18);
+    footer.removeFromLeft (16);
     qualityLb.setBounds (footer.removeFromLeft (54));
-    qualityBox.setBounds (footer.removeFromLeft (180));
+    qualityBox.setBounds (footer.removeFromLeft (170));
 
-    bypassBtn.setBounds (footer.removeFromRight (92));
-    puristBtn.setBounds (footer.removeFromRight (92));
+    bypassBtn.setBounds (footer.removeFromRight (86));
+    puristBtn.setBounds (footer.removeFromRight (82));
+    footer.removeFromRight (12);
+    safetyBtn.setBounds (footer.removeFromRight (84));
+    autoGainBtn.setBounds (footer.removeFromRight (104));
 }
