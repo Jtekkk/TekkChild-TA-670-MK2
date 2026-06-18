@@ -50,7 +50,8 @@ inline const std::vector<Preset>& factoryPresets()
           { { pid::input, 2.0f }, { pid::threshold, 8.0f }, { pid::timeConstant, 0.0f },
             { pid::scHpf, 1.0f }, { pid::mix, 85.0f }, { pid::output, 2.0f },
             { pid::compIn, 1.0f } },
-          { { pid::mode, 0.0f }, { pid::quality, 1.0f }, { pid::drive, 64.0f } } },
+          { { pid::mode, 0.0f }, { pid::quality, 1.0f }, { pid::drive, 64.0f },
+            { pid::tubeType, 1.0f }, { pid::tubeBias, 18.0f } } },
 
         { "Drum Parallel Punch",
           { { pid::threshold, 9.0f }, { pid::timeConstant, 0.0f }, { pid::scHpf, 1.0f },
@@ -65,7 +66,8 @@ inline const std::vector<Preset>& factoryPresets()
         { "Master Bus",
           { { pid::threshold, 4.0f }, { pid::timeConstant, 5.0f }, { pid::scHpf, 0.0f },
             { pid::mix, 100.0f }, { pid::output, 0.0f }, { pid::compIn, 1.0f } },
-          { { pid::mode, 2.0f }, { pid::quality, 2.0f }, { pid::drive, 42.0f } } },
+          { { pid::mode, 2.0f }, { pid::quality, 2.0f }, { pid::drive, 42.0f },
+            { pid::tubeType, 5.0f }, { pid::tubeVolt, 305.0f } } },
 
         { "Bass DI",
           { { pid::input, 1.0f }, { pid::threshold, 7.0f }, { pid::timeConstant, 1.0f },
@@ -81,7 +83,8 @@ inline const std::vector<Preset>& factoryPresets()
         { "Clean Color",
           { { pid::input, 3.0f }, { pid::threshold, 5.0f }, { pid::mix, 100.0f },
             { pid::output, -2.0f }, { pid::compIn, 0.0f } },
-          { { pid::mode, 0.0f }, { pid::quality, 2.0f }, { pid::drive, 80.0f } } },
+          { { pid::mode, 0.0f }, { pid::quality, 2.0f }, { pid::drive, 80.0f },
+            { pid::tubeType, 3.0f }, { pid::tubeBias, 28.0f } } },
     };
 
     return presets;

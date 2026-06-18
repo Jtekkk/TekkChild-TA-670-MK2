@@ -506,6 +506,54 @@ int main()
         setParam (proc, "drive", 50.0f);
     }
 
+    // -- Tube roll: type, bias, voltage --------------------------------------
+    {
+        setParam (proc, "bypass", 0.0f);
+        setParam (proc, "mode", 0.0f);
+        setParam (proc, "compinA", 0.0f);
+        setParam (proc, "compinB", 0.0f);
+        setParam (proc, "inputA", 0.0f);
+        setParam (proc, "outputA", 0.0f);
+        setParam (proc, "drive", 75.0f);
+        setParam (proc, "tubevolt", 250.0f);
+        setParam (proc, "tubebias", 0.0f);
+
+        auto peakForType = [&] (float type)
+        {
+            setParam (proc, "tubetype", type);
+            runSine (proc, buffer, 1.1f, 0.30, 110.0, fs);            // settle the glide
+            return runSine (proc, buffer, 1.1f, 0.10, 110.0, fs).peak; // measure
+        };
+
+        const float pHi    = peakForType (1.0f); // 12AX7 hi-gain
+        const float pClean = peakForType (2.0f); // 12AU7 clean
+        expect (std::isfinite (pHi) && std::isfinite (pClean),
+                "tube types produce finite output");
+        expect (pHi < pClean,
+                "hi-gain valve saturates harder than the clean valve (" + std::to_string (pHi)
+                    + " vs " + std::to_string (pClean) + ")");
+
+        // Biasing toward cutoff lowers the stage gain (and adds 2nd harmonic).
+        auto peakForBias = [&] (float bias)
+        {
+            setParam (proc, "tubetype", 0.0f);
+            setParam (proc, "tubebias", bias);
+            runSine (proc, buffer, 0.5f, 0.30, 110.0, fs);
+            return runSine (proc, buffer, 0.5f, 0.10, 110.0, fs).peak;
+        };
+
+        const float b0   = peakForBias (0.0f);
+        const float bBig = peakForBias (100.0f);
+        expect (bBig < b0,
+                "Bias shifts the operating point toward cutoff, lowering gain ("
+                    + std::to_string (b0) + " -> " + std::to_string (bBig) + ")");
+
+        setParam (proc, "tubetype", 0.0f);
+        setParam (proc, "tubebias", 0.0f);
+        setParam (proc, "tubevolt", 250.0f);
+        setParam (proc, "drive", 50.0f);
+    }
+
     std::cout << "\n" << (failures == 0 ? "ALL TESTS PASSED" : "TESTS FAILED")
               << std::endl;
 

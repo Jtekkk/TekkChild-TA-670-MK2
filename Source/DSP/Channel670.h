@@ -74,6 +74,12 @@ public:
         applyCharacter();
     }
 
+    // Tube-roll: selected valve coefficients + grid bias + plate-voltage headroom.
+    void setTube (float mu, float asym, float head, float bias) noexcept
+    {
+        tube.setCoeffs (mu, asym, head, bias);
+    }
+
     void reset() noexcept
     {
         cvNetwork.reset();

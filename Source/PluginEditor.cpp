@@ -524,21 +524,51 @@ TekkChild670Editor::TekkChild670Editor (TekkChild670Processor& p)
     bypassAt = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         processor.apvts, tekk::pid::bypass, bypassBtn);
 
-    // -- global DRIVE (tube + iron saturation), mounted under the mascot --
-    driveSlider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
-    driveSlider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 70, 16);
-    driveSlider.setDoubleClickReturnValue (true, 50.0);
-    driveSlider.setTooltip ("Drive - tube & transformer saturation amount (50 = stock 670 character)");
-    addAndMakeVisible (driveSlider);
+    // -- TUBE section: type selector above the mascot, DRIVE / BIAS / VOLTAGE
+    //    knobs below it --
+    auto setupTubeKnob = [this] (juce::Slider& s, juce::Label& l, const juce::String& name,
+                                 double dflt, const juce::String& tip)
+    {
+        s.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+        s.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 60, 14);
+        s.setDoubleClickReturnValue (true, dflt);
+        s.setTooltip (tip);
+        addAndMakeVisible (s);
 
-    driveLb.setText ("DRIVE", juce::dontSendNotification);
-    driveLb.setJustificationType (juce::Justification::centred);
-    driveLb.setFont (juce::Font (juce::FontOptions (12.0f)));
-    driveLb.setColour (juce::Label::textColourId, tekk::colours::textDim);
-    addAndMakeVisible (driveLb);
+        l.setText (name, juce::dontSendNotification);
+        l.setJustificationType (juce::Justification::centred);
+        l.setFont (juce::Font (juce::FontOptions (11.0f)));
+        l.setColour (juce::Label::textColourId, tekk::colours::textDim);
+        addAndMakeVisible (l);
+    };
+
+    setupTubeKnob (driveSlider, driveLb, "DRIVE", 50.0,
+                   "Drive - tube & transformer saturation (50 = stock 670)");
+    setupTubeKnob (biasSlider, biasLb, "BIAS", 0.0,
+                   "Tube Bias - shifts the operating point toward cutoff; adds 2nd-harmonic warmth");
+    setupTubeKnob (voltSlider, voltLb, "VOLTAGE", 250.0,
+                   "Plate Voltage - headroom; lower = starved/grittier, higher = cleaner");
 
     driveAt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         processor.apvts, tekk::pid::drive, driveSlider);
+    biasAt  = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+        processor.apvts, tekk::pid::tubeBias, biasSlider);
+    voltAt  = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+        processor.apvts, tekk::pid::tubeVolt, voltSlider);
+
+    tubeLb.setText ("TUBE", juce::dontSendNotification);
+    tubeLb.setJustificationType (juce::Justification::centred);
+    tubeLb.setFont (juce::Font (juce::FontOptions (11.0f)));
+    tubeLb.setColour (juce::Label::textColourId, tekk::colours::textDim);
+    addAndMakeVisible (tubeLb);
+
+    if (auto* choice = dynamic_cast<juce::AudioParameterChoice*> (
+            processor.apvts.getParameter (tekk::pid::tubeType)))
+        tubeBox.addItemList (choice->choices, 1);
+    tubeBox.setTooltip ("Tube Type - roll a different valve into the gain stage");
+    addAndMakeVisible (tubeBox);
+    tubeAt = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
+        processor.apvts, tekk::pid::tubeType, tubeBox);
 
     // -- preset bar --
     presetLb.setText ("PRESET", juce::dontSendNotification);
@@ -728,8 +758,11 @@ void TekkChild670Editor::resized()
     auto column = body.removeFromLeft (colW);
     stripB.setBounds (body.reduced (4, 0));
 
-    // square faceplate, centred vertically so the face fills its frame
-    const int plateH = juce::jmin (column.getHeight(), colW + 22);
+    // tube bay: TYPE selector on top, mascot in the middle, knobs below
+    auto tubeTypeArea = column.removeFromTop (40);
+    auto knobRow      = column.removeFromBottom (94);
+
+    const int plateH = juce::jmin (column.getHeight(), colW - 4);
     faceArea = column.withSizeKeepingCentre (colW, plateH).reduced (4, 2);
 
     // mirror the faceplate maths in paint() to locate the artwork, then the nose
@@ -749,13 +782,22 @@ void TekkChild670Editor::resized()
                            faceImageRect.getY() + side * 0.42f }).toNearestInt());
     }
 
-    // global DRIVE knob mounted in the chassis space below the faceplate
+    // tube type selector
+    tubeLb.setBounds (tubeTypeArea.removeFromLeft (46).withSizeKeepingCentre (46, 22));
+    tubeBox.setBounds (tubeTypeArea.reduced (2, 7));
+
+    // DRIVE / BIAS / VOLTAGE knobs
     {
-        auto belowFace = column.withTop (faceArea.getBottom() + 4);
-        auto driveArea = belowFace.withSizeKeepingCentre (juce::jmin (belowFace.getWidth(), 116),
-                                                          juce::jmin (belowFace.getHeight(), 86));
-        driveLb.setBounds (driveArea.removeFromBottom (16));
-        driveSlider.setBounds (driveArea);
+        auto rowR = knobRow.reduced (6, 2);
+        const int cw = rowR.getWidth() / 3;
+        auto place = [] (juce::Rectangle<int> cell, juce::Slider& s, juce::Label& l)
+        {
+            l.setBounds (cell.removeFromBottom (14));
+            s.setBounds (cell);
+        };
+        place (rowR.removeFromLeft (cw), driveSlider, driveLb);
+        place (rowR.removeFromLeft (cw), biasSlider,  biasLb);
+        place (rowR,                     voltSlider,  voltLb);
     }
 
     modeLb.setBounds (footer.removeFromLeft (44));

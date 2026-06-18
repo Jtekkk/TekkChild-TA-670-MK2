@@ -125,9 +125,15 @@ private:
     std::atomic<float>* pMode {};
     std::atomic<float>* pQuality {};
     std::atomic<float>* pDrive {};
+    std::atomic<float>* pTubeType {};
+    std::atomic<float>* pTubeBias {};
+    std::atomic<float>* pTubeVolt {};
     std::atomic<float>* pPurist {};
 
     float characterCurrent = 1.0f; // smoothed tube/transformer drive scaler
+
+    // smoothed tube-roll coefficients (glide between valve types / bias / voltage)
+    float tubeMuCur = 1.0f, tubeAsymCur = 0.035f, tubeHeadCur = 1.0f, tubeBiasCur = 0.0f;
 
     juce::AudioParameterBool* bypassParam = nullptr;
 

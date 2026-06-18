@@ -68,10 +68,16 @@ Per channel (A = Left/Lateral, B = Right/Vertical):
 | Output | -24..+12 dB | Clean output trim |
 | AGC In | on/off | Takes the gain reduction in or out while keeping the tube/iron colour |
 
-Global: Drive (tube + transformer saturation amount; 50 = stock 670
-character, lower is cleaner, higher is hotter), Channel Mode (Left/Right,
-Lat/Vert (M/S), L/R Linked), Engine (Eco / Zero Latency / Studio), Purist
-Mode, True Bypass.
+Global tube section (mounted around the mascot): **Tube Type** (roll a
+different valve into the gain stage — each voiced for a different mu /
+harmonic character), **Drive** (tube + transformer saturation; 50 = stock
+670, lower cleaner, higher hotter), **Bias** (shifts the grid operating
+point toward cutoff, lowering gain and adding 2nd-harmonic warmth), and
+**Plate Voltage** (headroom — lower is starved and grittier, higher is
+cleaner). Swapping any of these glides over ~100 ms so there are no clicks.
+
+Other global controls: Channel Mode (Left/Right, Lat/Vert (M/S), L/R
+Linked), Engine (Eco / Zero Latency / Studio), Purist Mode, True Bypass.
 
 Each channel strip shows a VU gain-reduction needle flanked by input and
 output level meters (dBFS, with peak hold).

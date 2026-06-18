@@ -153,12 +153,13 @@ private:
     juce::ComboBox modeBox, qualityBox;
     juce::ToggleButton puristBtn { "PURIST" }, bypassBtn { "BYPASS" };
 
-    juce::Slider driveSlider;
-    juce::Label  driveLb;
+    juce::Slider driveSlider, biasSlider, voltSlider;
+    juce::Label  driveLb, biasLb, voltLb, tubeLb;
+    juce::ComboBox tubeBox;
 
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> modeAt, qualityAt;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> modeAt, qualityAt, tubeAt;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>   puristAt, bypassAt;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   driveAt;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   driveAt, biasAt, voltAt;
 
     juce::TooltipWindow tooltips { this };
 

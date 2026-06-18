@@ -41,10 +41,13 @@ TekkChild670Processor::TekkChild670Processor()
         pCompIn[ch]       = apvts.getRawParameterValue (pid::forChannel (pid::compIn, ch));
     }
 
-    pMode    = apvts.getRawParameterValue (pid::mode);
-    pQuality = apvts.getRawParameterValue (pid::quality);
-    pDrive   = apvts.getRawParameterValue (pid::drive);
-    pPurist  = apvts.getRawParameterValue (pid::purist);
+    pMode     = apvts.getRawParameterValue (pid::mode);
+    pQuality  = apvts.getRawParameterValue (pid::quality);
+    pDrive    = apvts.getRawParameterValue (pid::drive);
+    pTubeType = apvts.getRawParameterValue (pid::tubeType);
+    pTubeBias = apvts.getRawParameterValue (pid::tubeBias);
+    pTubeVolt = apvts.getRawParameterValue (pid::tubeVolt);
+    pPurist   = apvts.getRawParameterValue (pid::purist);
 
     bypassParam = dynamic_cast<juce::AudioParameterBool*> (apvts.getParameter (pid::bypass));
     jassert (bypassParam != nullptr);
@@ -122,6 +125,21 @@ juce::AudioProcessorValueTreeState::ParameterLayout TekkChild670Processor::creat
         j::ParameterID (pid::drive, 1), "Drive",
         j::NormalisableRange<float> (0.0f, 100.0f, 0.1f), 50.0f,
         j::AudioParameterFloatAttributes().withLabel ("%")));
+
+    juce::StringArray tubeChoices;
+    for (int i = 0; i < tekk::kNumTubeTypes; ++i)
+        tubeChoices.add (tekk::kTubeTypes[i].name);
+    layout.add (std::make_unique<j::AudioParameterChoice> (
+        j::ParameterID (pid::tubeType, 1), "Tube Type", tubeChoices, 0));
+
+    layout.add (std::make_unique<j::AudioParameterFloat> (
+        j::ParameterID (pid::tubeBias, 1), "Tube Bias",
+        j::NormalisableRange<float> (-100.0f, 100.0f, 0.1f), 0.0f));
+
+    layout.add (std::make_unique<j::AudioParameterFloat> (
+        j::ParameterID (pid::tubeVolt, 1), "Plate Voltage",
+        j::NormalisableRange<float> (150.0f, 350.0f, 1.0f), 250.0f,
+        j::AudioParameterFloatAttributes().withLabel ("V")));
 
     layout.add (std::make_unique<j::AudioParameterBool> (
         j::ParameterID (pid::purist, 1), "Purist Mode", false));
@@ -401,6 +419,22 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
     characterCurrent += 0.25f * (driveTarget - characterCurrent); // per-block glide
     for (int ch = 0; ch < numCh; ++ch)
         channels[ch].setCharacter (characterCurrent);
+
+    // Tube roll: glide toward the selected valve's coefficients, the grid bias
+    // and the plate-voltage headroom, so swapping tubes warms up click-free.
+    const int   tubeIdx   = juce::jlimit (0, tekk::kNumTubeTypes - 1, (int) pTubeType->load());
+    const auto& tt        = tekk::kTubeTypes[tubeIdx];
+    const float biasTarget = juce::jlimit (-100.0f, 100.0f, pTubeBias->load()) * 0.0045f; // -0.45..0.45
+    const float voltScale  = juce::jmap (juce::jlimit (150.0f, 350.0f, pTubeVolt->load()),
+                                         150.0f, 350.0f, 0.60f, 1.40f);
+
+    tubeMuCur   += 0.25f * (tt.mu - tubeMuCur);
+    tubeAsymCur += 0.25f * (tt.asym - tubeAsymCur);
+    tubeHeadCur += 0.25f * (tt.head * voltScale - tubeHeadCur);
+    tubeBiasCur += 0.25f * (biasTarget - tubeBiasCur);
+
+    for (int ch = 0; ch < numCh; ++ch)
+        channels[ch].setTube (tubeMuCur, tubeAsymCur, tubeHeadCur, tubeBiasCur);
 
     for (int ch = 0; ch < numCh; ++ch)
     {
