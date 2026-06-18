@@ -371,7 +371,7 @@ int main()
             return -1;
         };
 
-        expect (proc.getNumPrograms() >= 8,
+        expect (proc.getNumPrograms() >= 28,
                 "factory presets are exposed (" + std::to_string (proc.getNumPrograms()) + ")");
 
         const int master = programIndex ("Master Bus");
@@ -606,6 +606,121 @@ int main()
 
         setParam (proc, "safety", 0.0f);
         setParam (proc, "outputA", 0.0f);
+    }
+
+    // -- Iron Drive (transformer saturation) ---------------------------------
+    {
+        setParam (proc, "bypass", 0.0f);
+        setParam (proc, "mode", 0.0f);
+        setParam (proc, "quality", 0.0f);
+        setParam (proc, "compinA", 0.0f);
+        setParam (proc, "compinB", 0.0f);
+        setParam (proc, "inputA", 0.0f);
+
+        setParam (proc, "irondrive", 10.0f);
+        const auto rLow = runSine (proc, buffer, 1.2f, 0.25, 110.0, fs);
+        proc.reset();
+        setParam (proc, "irondrive", 190.0f);
+        const auto rHigh = runSine (proc, buffer, 1.2f, 0.25, 110.0, fs);
+
+        expect (rLow.finite && rHigh.finite, "output is finite across iron drive range");
+        expect (rHigh.peak < 6.0f, "output stays bounded at max iron drive (peak "
+                                       + std::to_string (rHigh.peak) + ")");
+        setParam (proc, "irondrive", 100.0f);
+        setParam (proc, "compinA", 1.0f);
+        setParam (proc, "compinB", 1.0f);
+    }
+
+    // -- Valve hiss ----------------------------------------------------------
+    {
+        proc.reset(); // make sure no easter-egg playback bleeds into the measurement
+        setParam (proc, "quality", 0.0f);
+        setParam (proc, "compinA", 0.0f);
+        setParam (proc, "inputA", 0.0f);
+        setParam (proc, "noisefloor", 1.0f);
+
+        juce::MidiBuffer midi;
+        double noisePow = 0.0;
+        for (int blk = 0; blk < 100; ++blk)
+        {
+            buffer.clear();
+            proc.processBlock (buffer, midi);
+            for (int i = 0; i < blockSize; ++i)
+            {
+                const float o = buffer.getSample (0, i);
+                noisePow += (double) o * o;
+            }
+        }
+        const float noiseRms = (float) std::sqrt (noisePow / (100.0 * blockSize));
+
+        expect (noiseRms > 1.0e-7f, "valve hiss adds noise when enabled (rms "
+                                        + std::to_string (noiseRms) + ")");
+        expect (noiseRms < 5.0e-4f, "valve hiss is at a gentle calibrated level");
+        setParam (proc, "noisefloor", 0.0f);
+        setParam (proc, "compinA", 1.0f);
+    }
+
+    // -- Dry Gain ------------------------------------------------------------
+    {
+        setParam (proc, "quality", 0.0f);
+        setParam (proc, "mode", 0.0f);
+        setParam (proc, "compinA", 0.0f);
+        setParam (proc, "mixA", 50.0f);
+
+        setParam (proc, "drygainA", 6.0f);
+        const auto rBoost = runSine (proc, buffer, 0.5f, 0.25, 220.0, fs);
+        proc.reset();
+        setParam (proc, "drygainA", -6.0f);
+        const auto rCut = runSine (proc, buffer, 0.5f, 0.25, 220.0, fs);
+
+        expect (rBoost.outRmsDb > rCut.outRmsDb + 3.0,
+                "dry gain +6 dB raises output; -6 dB lowers it ("
+                    + std::to_string (rCut.outRmsDb) + " -> " + std::to_string (rBoost.outRmsDb) + ")");
+        setParam (proc, "drygainA", 0.0f);
+        setParam (proc, "mixA", 100.0f);
+        setParam (proc, "compinA", 1.0f);
+    }
+
+    // -- Stereo link amount --------------------------------------------------
+    {
+        setParam (proc, "quality", 0.0f);
+        setParam (proc, "mode", 2.0f);   // L/R Linked
+        setParam (proc, "inputA", 6.0f); // A loud, B quiet
+        setParam (proc, "inputB", 0.0f);
+        setParam (proc, "thresholdA", 8.0f);
+        setParam (proc, "thresholdB", 8.0f);
+
+        setParam (proc, "linkamount", 100.0f);
+        runSine (proc, buffer, 0.5f, 0.6, 220.0, fs, true);
+        const float grHardA = proc.getGainReductionDb (0);
+        const float grHardB = proc.getGainReductionDb (1);
+
+        proc.reset();
+        setParam (proc, "linkamount", 0.0f);
+        runSine (proc, buffer, 0.5f, 0.6, 220.0, fs, true);
+        const float grSoftA = proc.getGainReductionDb (0);
+        const float grSoftB = proc.getGainReductionDb (1);
+
+        expect (std::abs (grHardA - grHardB) < 1.0f,
+                "hard link (100%) makes both channels track the louder one");
+        expect (grSoftB < grSoftA * 0.5f,
+                "soft link (0%) lets the quiet channel compress independently");
+        setParam (proc, "linkamount", 100.0f);
+        setParam (proc, "inputA", 0.0f);
+        setParam (proc, "inputB", 0.0f);
+    }
+
+    // -- reset() clears the level meters -------------------------------------
+    {
+        setParam (proc, "mode", 0.0f);
+        setParam (proc, "quality", 0.0f);
+        setParam (proc, "compinA", 1.0f);
+        runSine (proc, buffer, 0.5f, 0.2, 220.0, fs);
+        proc.reset();
+
+        expect (proc.getInputLevelDb (0) <= -99.0f, "reset clears the input meter");
+        expect (proc.getOutputLevelDb (0) <= -99.0f, "reset clears the output meter");
+        expect (proc.getGainReductionDb (0) == 0.0f, "reset clears the GR meter");
     }
 
     std::cout << "\n" << (failures == 0 ? "ALL TESTS PASSED" : "TESTS FAILED")

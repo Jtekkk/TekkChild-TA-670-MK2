@@ -85,11 +85,14 @@ private:
     juce::AudioBuffer<float> dryBuffer;
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::None> dryDelay;
 
-    juce::SmoothedValue<float> inputGainSm[2], outputGainSm[2], mixSm[2];
+    juce::SmoothedValue<float> inputGainSm[2], outputGainSm[2], mixSm[2], dryGainSm[2];
 
     // Detector controls are smoothed at the (possibly oversampled) detector
     // rate so automating Threshold / DC Threshold glides instead of zippering.
     juce::SmoothedValue<float> thresholdSm[2], biasSm[2], kneeSm[2];
+
+    // Link amount (0..1) consumed per OS sample in the CV loop.
+    juce::SmoothedValue<float> linkAmountSm;
 
     static int clampCh (int ch) noexcept { return ch < 0 ? 0 : (ch > 1 ? 1 : ch); }
 
@@ -121,13 +124,17 @@ private:
     std::atomic<float>* pScHpf[2] {};
     std::atomic<float>* pMix[2] {};
     std::atomic<float>* pOutput[2] {};
+    std::atomic<float>* pDryGain[2] {};
     std::atomic<float>* pCompIn[2] {};
     std::atomic<float>* pMode {};
     std::atomic<float>* pQuality {};
     std::atomic<float>* pDrive {};
+    std::atomic<float>* pIronDrive {};
     std::atomic<float>* pTubeType {};
     std::atomic<float>* pTubeBias {};
     std::atomic<float>* pTubeVolt {};
+    std::atomic<float>* pNoiseFloor {};
+    std::atomic<float>* pLinkAmount {};
     std::atomic<float>* pAutoMk {};
     std::atomic<float>* pSafety {};
     std::atomic<float>* pPurist {};

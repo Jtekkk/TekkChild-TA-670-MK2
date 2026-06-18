@@ -63,21 +63,29 @@ Per channel (A = Left/Lateral, B = Right/Vertical):
 | Threshold | 0..10 | Detector sensitivity, hardware-style taper |
 | Time Constant | 1..6 | The six original attack/release networks (5 and 6 are program-dependent) |
 | DC Threshold | -10..+10 | Rectifier bias: earlier/softer knee anticlockwise, later/harder clockwise |
-| SC Filter | Off..300 Hz | Sidechain high-pass; keeps bass from pumping the unit |
+| SC Filter | Off..400 Hz | Sidechain high-pass (Off/40/60/100/150/200/300/400 Hz); keeps bass from pumping the unit |
 | Mix | 0..100% | Latency-aligned parallel compression blend |
 | Output | -24..+12 dB | Clean output trim |
+| Dry Gain | -12..+12 dB | Trims the dry side of the Mix blend (for parallel compression) |
 | AGC In | on/off | Takes the gain reduction in or out while keeping the tube/iron colour |
 
-Global tube section (mounted around the mascot): **Tube Type** (roll a
+Global tube / iron section (mounted around the mascot): **Tube Type** (roll a
 different valve into the gain stage — each voiced for a different mu /
-harmonic character), **Drive** (tube + transformer saturation; 50 = stock
-670, lower cleaner, higher hotter), **Bias** (shifts the grid operating
-point toward cutoff, lowering gain and adding 2nd-harmonic warmth), and
-**Plate Voltage** (headroom — lower is starved and grittier, higher is
-cleaner). Swapping any of these glides over ~100 ms so there are no clicks.
+harmonic character), **Drive** (tube saturation; 50 = stock 670), **Iron
+Drive** (transformer saturation, 0..200%; 100 = stock, lower cleaner, higher
+hotter), **Bias** (shifts the grid operating point toward cutoff, lowering
+gain and adding 2nd-harmonic warmth), and **Plate Voltage** (headroom — lower
+is starved and grittier, higher is cleaner). Swapping any of these glides over
+~100 ms so there are no clicks.
 
-Other global controls: Channel Mode (Left/Right, Lat/Vert (M/S), L/R
-Linked), Engine (Eco / Zero Latency / Studio), Purist Mode, True Bypass.
+Other global controls: Channel Mode (Left/Right, Lat/Vert (M/S), L/R Linked),
+**Link Amount** (0..100% — blends from independent toward a hard stereo link
+in Linked mode), **Valve Hiss** (a gentle calibrated tube noise floor),
+Engine (Eco / Zero Latency / Studio), Purist Mode, True Bypass.
+
+The compressor can also be keyed from an **external sidechain** input (an
+optional stereo aux bus): when fed, the detector listens to the sidechain
+instead of the internal feedback.
 
 Output tools: **Auto Gain** (tracks the average gain reduction and adds it
 back at the output, holding level for sustained material while leaving
@@ -89,13 +97,12 @@ output level meters (dBFS, with peak hold).
 
 ## Presets
 
-Ten factory presets are exposed through the host's program interface (so they
-appear in the DAW's preset menu) and via the preset bar in the UI: Init,
-Vocal Leveler, Vocal Parallel, Drum Bus Smash, Drum Parallel Punch, Mix Glue,
-Master Bus, Bass DI, Brick Limiter and Clean Color. Loading a preset resets
-every sound parameter to its default and then applies the preset, so each one
-is a complete, deterministic starting point. They are defined in
-`Source/Presets.h`.
+Thirty factory presets are exposed through the host's program interface (so
+they appear in the DAW's preset menu) and via the preset bar in the UI —
+vocals, drums, bass, guitars, bus/mastering, broadcast and creative settings.
+Loading a preset resets every sound parameter to its default and then applies
+the preset, so each one is a complete, deterministic starting point. They are
+defined in `Source/Presets.h`.
 
 ## Signal path
 

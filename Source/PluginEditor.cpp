@@ -376,6 +376,23 @@ ChannelStrip::ChannelStrip (TekkChild670Processor& p, int channelIndex, const ju
     mixAt          = std::make_unique<SliderAttachment> (apvts, pid::forChannel (pid::mix, channel), mix);
     outputAt       = std::make_unique<SliderAttachment> (apvts, pid::forChannel (pid::output, channel), output);
 
+    // Dry Gain -- thin horizontal bar (trims the dry side of the Mix blend)
+    dryGain.setSliderStyle (juce::Slider::LinearBar);
+    dryGain.setTextValueSuffix (" dB");
+    dryGain.setDoubleClickReturnValue (true, 0.0);
+    dryGain.setColour (juce::Slider::trackColourId, colours::amber.withAlpha (0.5f));
+    dryGain.setColour (juce::Slider::textBoxTextColourId, colours::textDim);
+    dryGain.setTooltip ("Dry Gain - trims the dry side of the Mix blend");
+    addAndMakeVisible (dryGain);
+
+    dryGainLb.setText ("DRY GAIN", juce::dontSendNotification);
+    dryGainLb.setJustificationType (juce::Justification::centredLeft);
+    dryGainLb.setFont (juce::Font (juce::FontOptions (11.0f)));
+    dryGainLb.setColour (juce::Label::textColourId, colours::textDim);
+    addAndMakeVisible (dryGainLb);
+
+    dryGainAt = std::make_unique<SliderAttachment> (apvts, pid::forChannel (pid::dryGain, channel), dryGain);
+
     hpfLb.setText ("SC FILTER", juce::dontSendNotification);
     hpfLb.setFont (juce::Font (juce::FontOptions (12.0f)));
     hpfLb.setColour (juce::Label::textColourId, colours::textDim);
@@ -469,10 +486,14 @@ void ChannelStrip::resized()
         }
     };
 
-    layoutRow (r.removeFromTop (140), { &input, &threshold, &timeConstant },
+    layoutRow (r.removeFromTop (132), { &input, &threshold, &timeConstant },
                                       { &inputLb, &thresholdLb, &timeConstantLb });
-    layoutRow (r.removeFromTop (140), { &dcThreshold, &mix, &output },
+    layoutRow (r.removeFromTop (132), { &dcThreshold, &mix, &output },
                                       { &dcThresholdLb, &mixLb, &outputLb });
+
+    auto dryRow = r.removeFromTop (26);
+    dryGainLb.setBounds (dryRow.removeFromLeft (72));
+    dryGain.setBounds (dryRow.reduced (2, 4));
 
     auto bottom = r.removeFromTop (30);
     hpfLb.setBounds (bottom.removeFromLeft (66));
@@ -552,7 +573,9 @@ TekkChild670Editor::TekkChild670Editor (TekkChild670Processor& p)
     };
 
     setupTubeKnob (driveSlider, driveLb, "DRIVE", 50.0,
-                   "Drive - tube & transformer saturation (50 = stock 670)");
+                   "Drive - tube saturation amount (50 = stock 670 character)");
+    setupTubeKnob (ironSlider, ironLb, "IRON", 100.0,
+                   "Iron Drive - transformer saturation (100 = stock; lower cleaner, higher hotter)");
     setupTubeKnob (biasSlider, biasLb, "BIAS", 0.0,
                    "Tube Bias - shifts the operating point toward cutoff; adds 2nd-harmonic warmth");
     setupTubeKnob (voltSlider, voltLb, "VOLTAGE", 250.0,
@@ -560,6 +583,8 @@ TekkChild670Editor::TekkChild670Editor (TekkChild670Processor& p)
 
     driveAt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         processor.apvts, tekk::pid::drive, driveSlider);
+    ironAt  = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+        processor.apvts, tekk::pid::ironDrive, ironSlider);
     biasAt  = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         processor.apvts, tekk::pid::tubeBias, biasSlider);
     voltAt  = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
@@ -578,6 +603,27 @@ TekkChild670Editor::TekkChild670Editor (TekkChild670Processor& p)
     addAndMakeVisible (tubeBox);
     tubeAt = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
         processor.apvts, tekk::pid::tubeType, tubeBox);
+
+    // -- global Link Amount + Valve Hiss (footer) --
+    linkAmtKnob.setSliderStyle (juce::Slider::LinearBar);
+    linkAmtKnob.setTextValueSuffix (" %");
+    linkAmtKnob.setDoubleClickReturnValue (true, 100.0);
+    linkAmtKnob.setColour (juce::Slider::trackColourId, tekk::colours::amber.withAlpha (0.6f));
+    linkAmtKnob.setColour (juce::Slider::textBoxTextColourId, tekk::colours::cream);
+    linkAmtKnob.setTooltip ("Link Amount - 100% = hard stereo link, 0% = independent (L/R Linked mode)");
+    addAndMakeVisible (linkAmtKnob);
+
+    linkAmtLb.setText ("LINK", juce::dontSendNotification);
+    linkAmtLb.setFont (juce::Font (juce::FontOptions (12.0f)));
+    addAndMakeVisible (linkAmtLb);
+
+    linkAmtAt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+        processor.apvts, tekk::pid::linkAmount, linkAmtKnob);
+
+    noiseBtn.setTooltip ("Valve Hiss - adds a gentle calibrated tube noise floor");
+    addAndMakeVisible (noiseBtn);
+    noiseAt = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
+        processor.apvts, tekk::pid::noiseFloor, noiseBtn);
 
     // -- preset bar --
     presetLb.setText ("PRESET", juce::dontSendNotification);
@@ -609,7 +655,7 @@ TekkChild670Editor::TekkChild670Editor (TekkChild670Processor& p)
     refreshPresetBox();
     startTimerHz (8); // keep the box in step with host-driven program changes
 
-    setSize (960, 632);
+    setSize (960, 668);
 }
 
 void TekkChild670Editor::loadProgram (int index)
@@ -758,7 +804,9 @@ void TekkChild670Editor::resized()
     presetBox.setBounds (presetBar.removeFromLeft (240).reduced (2, 1));
     nextPreset.setBounds (presetBar.removeFromLeft (30).reduced (1));
 
-    auto footer = r.removeFromBottom (52).reduced (14, 10);
+    auto footerFull = r.removeFromBottom (84).reduced (14, 8);
+    auto footerRow2 = footerFull.removeFromBottom (32);
+    auto footer     = footerFull; // top row
 
     auto body = r.reduced (12, 6);
     const int colW  = 280;
@@ -795,20 +843,22 @@ void TekkChild670Editor::resized()
     tubeLb.setBounds (tubeTypeArea.removeFromLeft (46).withSizeKeepingCentre (46, 22));
     tubeBox.setBounds (tubeTypeArea.reduced (2, 7));
 
-    // DRIVE / BIAS / VOLTAGE knobs
+    // DRIVE / IRON / BIAS / VOLTAGE knobs
     {
-        auto rowR = knobRow.reduced (6, 2);
-        const int cw = rowR.getWidth() / 3;
+        auto rowR = knobRow.reduced (4, 2);
+        const int cw = rowR.getWidth() / 4;
         auto place = [] (juce::Rectangle<int> cell, juce::Slider& s, juce::Label& l)
         {
             l.setBounds (cell.removeFromBottom (14));
             s.setBounds (cell);
         };
         place (rowR.removeFromLeft (cw), driveSlider, driveLb);
+        place (rowR.removeFromLeft (cw), ironSlider,  ironLb);
         place (rowR.removeFromLeft (cw), biasSlider,  biasLb);
         place (rowR,                     voltSlider,  voltLb);
     }
 
+    // footer row 1: mode / engine + output toggles
     modeLb.setBounds (footer.removeFromLeft (44));
     modeBox.setBounds (footer.removeFromLeft (130));
     footer.removeFromLeft (16);
@@ -820,4 +870,9 @@ void TekkChild670Editor::resized()
     footer.removeFromRight (12);
     safetyBtn.setBounds (footer.removeFromRight (84));
     autoGainBtn.setBounds (footer.removeFromRight (104));
+
+    // footer row 2: stereo link amount + valve hiss
+    linkAmtLb.setBounds (footerRow2.removeFromLeft (44));
+    linkAmtKnob.setBounds (footerRow2.removeFromLeft (200).reduced (0, 4));
+    noiseBtn.setBounds (footerRow2.removeFromRight (86));
 }

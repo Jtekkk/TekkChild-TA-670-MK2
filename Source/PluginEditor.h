@@ -81,12 +81,15 @@ private:
     juce::Slider input, threshold, timeConstant, dcThreshold, mix, output;
     juce::Label  inputLb, thresholdLb, timeConstantLb, dcThresholdLb, mixLb, outputLb;
 
+    juce::Slider dryGain;
+    juce::Label  dryGainLb;
+
     juce::Label        hpfLb;
     juce::ComboBox     hpfBox;
     juce::ToggleButton compInBtn { "AGC IN" };
 
     std::unique_ptr<SliderAttachment> inputAt, thresholdAt, timeConstantAt,
-                                      dcThresholdAt, mixAt, outputAt;
+                                      dcThresholdAt, mixAt, outputAt, dryGainAt;
     std::unique_ptr<ComboBoxAttachment> hpfAt;
     std::unique_ptr<ButtonAttachment>   compInAt;
 
@@ -152,16 +155,20 @@ private:
     juce::Label    modeLb, qualityLb;
     juce::ComboBox modeBox, qualityBox;
     juce::ToggleButton puristBtn { "PURIST" }, bypassBtn { "BYPASS" };
-    juce::ToggleButton autoGainBtn { "AUTO GAIN" }, safetyBtn { "SAFETY" };
+    juce::ToggleButton autoGainBtn { "AUTO GAIN" }, safetyBtn { "SAFETY" }, noiseBtn { "HISS" };
 
-    juce::Slider driveSlider, biasSlider, voltSlider;
-    juce::Label  driveLb, biasLb, voltLb, tubeLb;
+    juce::Slider driveSlider, ironSlider, biasSlider, voltSlider;
+    juce::Label  driveLb, ironLb, biasLb, voltLb, tubeLb;
     juce::ComboBox tubeBox;
+
+    juce::Slider linkAmtKnob;
+    juce::Label  linkAmtLb;
 
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> modeAt, qualityAt, tubeAt;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>   puristAt, bypassAt,
-                                                                           autoGainAt, safetyAt;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   driveAt, biasAt, voltAt;
+                                                                           autoGainAt, safetyAt, noiseAt;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   driveAt, ironAt, biasAt, voltAt,
+                                                                           linkAmtAt;
 
     juce::TooltipWindow tooltips { this };
 
