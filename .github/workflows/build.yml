@@ -79,11 +79,10 @@ jobs:
         shell: pwsh
         run: |
           choco install nsis -y --no-progress
-          $vst3 = (Get-ChildItem "build/TekkChild670_artefacts/Release/VST3" -Filter *.vst3 -Directory |
-                   Select-Object -First 1).FullName -replace '\\','/'
-          Write-Host "Packaging VST3: $vst3"
+          $vst3dir = (Resolve-Path "build/TekkChild670_artefacts/Release/VST3").Path
+          Write-Host "Packaging from: $vst3dir"
           Push-Location installer
-          & "C:\Program Files (x86)\NSIS\makensis.exe" "/DVST3SRC=$vst3" "/DVERSION=2.0.0" TekkChild-TC-670.nsi
+          & "C:\Program Files (x86)\NSIS\makensis.exe" "/DVST3DIR=$vst3dir" "/DVERSION=2.0.0" TekkChild-TC-670.nsi
           if ($LASTEXITCODE -ne 0) { throw "makensis failed ($LASTEXITCODE)" }
           Pop-Location
 
