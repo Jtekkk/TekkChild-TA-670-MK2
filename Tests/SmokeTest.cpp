@@ -477,6 +477,35 @@ int main()
                     + std::to_string (peak) + ")");
     }
 
+    // -- Drive / saturation --------------------------------------------------
+    {
+        // More Drive = harder tube/iron saturation, which clamps a hot peak more.
+        setParam (proc, "bypass", 0.0f);
+        setParam (proc, "mode", 0.0f);
+        setParam (proc, "compinA", 0.0f); // colour only, isolate saturation
+        setParam (proc, "compinB", 0.0f);
+        setParam (proc, "inputA", 0.0f);
+        setParam (proc, "outputA", 0.0f);
+
+        auto peakAtDrive = [&] (float drive)
+        {
+            setParam (proc, "drive", drive);
+            runSine (proc, buffer, 1.2f, 0.30, 110.0, fs);            // settle character
+            return runSine (proc, buffer, 1.2f, 0.10, 110.0, fs).peak; // measure
+        };
+
+        const float lo = peakAtDrive (0.0f);
+        const float hi = peakAtDrive (100.0f);
+
+        expect (std::isfinite (lo) && std::isfinite (hi) && lo > 0.1f,
+                "Drive output is finite and present");
+        expect (hi < lo,
+                "higher Drive saturates harder (peak " + std::to_string (lo)
+                    + " -> " + std::to_string (hi) + ")");
+
+        setParam (proc, "drive", 50.0f);
+    }
+
     std::cout << "\n" << (failures == 0 ? "ALL TESTS PASSED" : "TESTS FAILED")
               << std::endl;
 

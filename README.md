@@ -68,8 +68,10 @@ Per channel (A = Left/Lateral, B = Right/Vertical):
 | Output | -24..+12 dB | Clean output trim |
 | AGC In | on/off | Takes the gain reduction in or out while keeping the tube/iron colour |
 
-Global: Channel Mode (Left/Right, Lat/Vert (M/S), L/R Linked), Engine
-(Eco / Zero Latency / Studio), Purist Mode, True Bypass.
+Global: Drive (tube + transformer saturation amount; 50 = stock 670
+character, lower is cleaner, higher is hotter), Channel Mode (Left/Right,
+Lat/Vert (M/S), L/R Linked), Engine (Eco / Zero Latency / Studio), Purist
+Mode, True Bypass.
 
 Each channel strip shows a VU gain-reduction needle flanked by input and
 output level meters (dBFS, with peak hold).

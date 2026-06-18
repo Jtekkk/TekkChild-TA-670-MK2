@@ -55,17 +55,23 @@ public:
         tube.prepare (sampleRate);
         scFilter.prepare (sampleRate);
 
-        inputTransformer.setDrive (0.45f);   // UTC A26: line level, modest flux
-        outputTransformer.setDrive (0.8f);   // Sowter: driven by the power stage
         inputTransformer.setHfRolloff (60000.0f);  // essentially flat in band
         outputTransformer.setHfRolloff (30000.0f); // output iron sets the bandwidth
-        tube.setDrive (0.7f);
+        applyCharacter();                           // sets tube + transformer drives
 
         // ~15 ms linear ramp when AGC In is toggled, so the gain reduction
         // fades in/out instead of switching as a step
         engageInc = (float) (1.0 / (0.015 * fs));
 
         reset();
+    }
+
+    // Scales how hard the tube and transformers are driven, so the user can
+    // dial the harmonic character in and out. 1.0 == the stock calibration.
+    void setCharacter (float factor) noexcept
+    {
+        characterFactor = factor;
+        applyCharacter();
     }
 
     void reset() noexcept
@@ -150,10 +156,23 @@ private:
         return std::pow (10.0f, db * (1.0f / 20.0f));
     }
 
+    void applyCharacter() noexcept
+    {
+        inputTransformer.setDrive  (kInDrive  * characterFactor); // UTC A26
+        outputTransformer.setDrive (kOutDrive * characterFactor); // Sowter
+        tube.setDrive              (kTubeDrive * characterFactor);
+    }
+
     // calibration of the variable-mu gain-reduction law
     static constexpr float kMaxGainReductionDb = 22.0f; // ceiling the loop approaches
     static constexpr float kGrSlope            = 1.0f / 13.0f; // GR build per dB over threshold
     static constexpr float kTubeGrDrive        = 1.2f;  // extra tube curvature at full GR
+
+    // stock drive levels (characterFactor == 1.0 reproduces the calibration)
+    static constexpr float kInDrive   = 0.45f;
+    static constexpr float kOutDrive  = 0.8f;
+    static constexpr float kTubeDrive = 0.7f;
+    float characterFactor = 1.0f;
 
     ChannelParams params;
 

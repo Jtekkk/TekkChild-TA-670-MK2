@@ -524,6 +524,22 @@ TekkChild670Editor::TekkChild670Editor (TekkChild670Processor& p)
     bypassAt = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         processor.apvts, tekk::pid::bypass, bypassBtn);
 
+    // -- global DRIVE (tube + iron saturation), mounted under the mascot --
+    driveSlider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+    driveSlider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 70, 16);
+    driveSlider.setDoubleClickReturnValue (true, 50.0);
+    driveSlider.setTooltip ("Drive - tube & transformer saturation amount (50 = stock 670 character)");
+    addAndMakeVisible (driveSlider);
+
+    driveLb.setText ("DRIVE", juce::dontSendNotification);
+    driveLb.setJustificationType (juce::Justification::centred);
+    driveLb.setFont (juce::Font (juce::FontOptions (12.0f)));
+    driveLb.setColour (juce::Label::textColourId, tekk::colours::textDim);
+    addAndMakeVisible (driveLb);
+
+    driveAt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+        processor.apvts, tekk::pid::drive, driveSlider);
+
     // -- preset bar --
     presetLb.setText ("PRESET", juce::dontSendNotification);
     presetLb.setFont (juce::Font (juce::FontOptions (12.0f)));
@@ -731,6 +747,15 @@ void TekkChild670Editor::resized()
         noseHotspot.setBounds (juce::Rectangle<float> (ns, ns)
             .withCentre ({ (float) faceImageRect.getCentreX(),
                            faceImageRect.getY() + side * 0.42f }).toNearestInt());
+    }
+
+    // global DRIVE knob mounted in the chassis space below the faceplate
+    {
+        auto belowFace = column.withTop (faceArea.getBottom() + 4);
+        auto driveArea = belowFace.withSizeKeepingCentre (juce::jmin (belowFace.getWidth(), 116),
+                                                          juce::jmin (belowFace.getHeight(), 86));
+        driveLb.setBounds (driveArea.removeFromBottom (16));
+        driveSlider.setBounds (driveArea);
     }
 
     modeLb.setBounds (footer.removeFromLeft (44));

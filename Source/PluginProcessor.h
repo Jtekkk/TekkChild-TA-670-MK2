@@ -124,7 +124,10 @@ private:
     std::atomic<float>* pCompIn[2] {};
     std::atomic<float>* pMode {};
     std::atomic<float>* pQuality {};
+    std::atomic<float>* pDrive {};
     std::atomic<float>* pPurist {};
+
+    float characterCurrent = 1.0f; // smoothed tube/transformer drive scaler
 
     juce::AudioParameterBool* bypassParam = nullptr;
 

@@ -43,6 +43,7 @@ TekkChild670Processor::TekkChild670Processor()
 
     pMode    = apvts.getRawParameterValue (pid::mode);
     pQuality = apvts.getRawParameterValue (pid::quality);
+    pDrive   = apvts.getRawParameterValue (pid::drive);
     pPurist  = apvts.getRawParameterValue (pid::purist);
 
     bypassParam = dynamic_cast<juce::AudioParameterBool*> (apvts.getParameter (pid::bypass));
@@ -116,6 +117,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout TekkChild670Processor::creat
     layout.add (std::make_unique<j::AudioParameterChoice> (
         j::ParameterID (pid::quality, 1), "Engine",
         juce::StringArray { "Eco (No OS)", "Zero Latency (4x IIR)", "Studio (4x Linear Phase)" }, 1));
+
+    layout.add (std::make_unique<j::AudioParameterFloat> (
+        j::ParameterID (pid::drive, 1), "Drive",
+        j::NormalisableRange<float> (0.0f, 100.0f, 0.1f), 50.0f,
+        j::AudioParameterFloatAttributes().withLabel ("%")));
 
     layout.add (std::make_unique<j::AudioParameterBool> (
         j::ParameterID (pid::purist, 1), "Purist Mode", false));
@@ -387,6 +393,14 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
     const int  mode   = juce::jlimit (0, 2, (int) pMode->load());
     const bool msMode = mode == 1 && numCh == 2;
     const bool linked = mode == 2 && numCh == 2;
+
+    // Drive: 0..100 maps to a saturation scaler centred on 1.0 (== stock) at 50.
+    const float driveKnob = juce::jlimit (0.0f, 100.0f, pDrive->load());
+    const float driveTarget = driveKnob <= 50.0f ? juce::jmap (driveKnob, 0.0f, 50.0f, 0.5f, 1.0f)
+                                                  : juce::jmap (driveKnob, 50.0f, 100.0f, 1.0f, 1.6f);
+    characterCurrent += 0.25f * (driveTarget - characterCurrent); // per-block glide
+    for (int ch = 0; ch < numCh; ++ch)
+        channels[ch].setCharacter (characterCurrent);
 
     for (int ch = 0; ch < numCh; ++ch)
     {

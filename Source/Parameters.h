@@ -19,6 +19,7 @@ inline constexpr const char* compIn       = "compin";
 // Global
 inline constexpr const char* mode    = "mode";    // Left/Right, Lat/Vert, L/R Linked
 inline constexpr const char* quality = "quality"; // Eco, Zero-Latency, Studio
+inline constexpr const char* drive   = "drive";   // tube + transformer saturation amount
 inline constexpr const char* purist  = "purist";  // takes the MK2 additions out of circuit
 inline constexpr const char* bypass  = "bypass";  // true bypass
 
