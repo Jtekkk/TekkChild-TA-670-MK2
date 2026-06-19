@@ -1661,16 +1661,17 @@ void LimiterPanel::paint (juce::Graphics& g)
         g.setColour (juce::Colour (0xff111111));
         g.drawRoundedRectangle (s.reduced (5.0f), 7.0f, 3.0f); // inner black border
 
-        auto txt = s.reduced (s.getWidth() * 0.12f, s.getHeight() * 0.07f);
+        auto txt = s.reduced (s.getWidth() * 0.08f, s.getHeight() * 0.06f);
         g.setColour (juce::Colour (0xff111111));
 
-        auto head = txt.removeFromTop (txt.getHeight() * 0.40f);
-        g.setFont (juce::Font (juce::FontOptions (head.getHeight() * 0.42f)).boldened());
+        // "SPEED" / "LIMIT" sized to the width so they never truncate
+        auto head = txt.removeFromTop (txt.getHeight() * 0.34f);
+        g.setFont (juce::Font (juce::FontOptions (txt.getWidth() * 0.17f)).boldened());
         g.drawText ("SPEED", head.removeFromTop (head.getHeight() * 0.5f), juce::Justification::centred);
         g.drawText ("LIMIT", head, juce::Justification::centred);
 
         // big number, sized to fit both the width (up to 3 digits) and height
-        const float numFont = juce::jmin (txt.getHeight() * 0.82f, txt.getWidth() * 0.52f);
+        const float numFont = juce::jmin (txt.getHeight() * 0.78f, txt.getWidth() * 0.5f);
         g.setFont (juce::Font (juce::FontOptions (numFont)).boldened());
         g.drawText (juce::String (limit), txt, juce::Justification::centred);
     }
@@ -1854,7 +1855,7 @@ TekkChild670Editor::TekkChild670Editor (TekkChild670Processor& p)
     refreshPresetBox();
     startTimerHz (8); // keep the box in step with host-driven program changes
 
-    setSize (2160, 668);
+    setSize (2280, 668);
 }
 
 void TekkChild670Editor::loadProgram (int index)
@@ -2059,7 +2060,7 @@ void TekkChild670Editor::resized()
     r.removeFromTop (52); // header, painted
 
     // 1176 limiter, Stereo Imager (CRT TV) and Tape Brain: modules bolted right.
-    auto limiterArea = r.removeFromRight (320);
+    auto limiterArea = r.removeFromRight (440);
     limiterPanel.setBounds (limiterArea.reduced (10, 8));
     auto imagerArea = r.removeFromRight (400);
     imagerPanel.setBounds (imagerArea.reduced (10, 8));
