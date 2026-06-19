@@ -71,6 +71,9 @@ TekkChild670Processor::TekkChild670Processor()
     pTapeXtalk = apvts.getRawParameterValue (pid::tapeXtalk);
     pTapeDeg   = apvts.getRawParameterValue (pid::tapeDegrade);
 
+    pMonoMaker = apvts.getRawParameterValue (pid::monoMaker);
+    pStereoEnh = apvts.getRawParameterValue (pid::stereoEnhance);
+
     bypassParam = dynamic_cast<juce::AudioParameterBool*> (apvts.getParameter (pid::bypass));
     jassert (bypassParam != nullptr);
 }
@@ -225,6 +228,16 @@ juce::AudioProcessorValueTreeState::ParameterLayout TekkChild670Processor::creat
     tapeKnob (pid::tapeXtalk,   "Crosstalk",       0.0f);
     tapeKnob (pid::tapeDegrade, "Degrade",         0.0f);
 
+    // -- Stereo Imager (TEKKVISION) --
+    layout.add (std::make_unique<j::AudioParameterFloat> (
+        j::ParameterID (pid::monoMaker, 1), "Mono Maker",
+        j::NormalisableRange<float> (0.0f, 100.0f, 0.1f), 0.0f,
+        j::AudioParameterFloatAttributes().withLabel ("%")));
+    layout.add (std::make_unique<j::AudioParameterFloat> (
+        j::ParameterID (pid::stereoEnhance, 1), "Stereo Enhance",
+        j::NormalisableRange<float> (0.0f, 100.0f, 0.1f), 0.0f,
+        j::AudioParameterFloatAttributes().withLabel ("%")));
+
     return layout;
 }
 
@@ -245,6 +258,12 @@ void TekkChild670Processor::prepareToPlay (double sampleRate, int samplesPerBloc
     dryBuffer.setSize (2, samplesPerBlock);
     tapeBuffer.setSize (2, samplesPerBlock);
     tapeBrain.prepare (sampleRate); // tape runs at base rate on the final output
+
+    sideGainSm.reset (sampleRate, 0.03);
+    sideGainSm.setCurrentAndTargetValue (1.0f);
+    std::fill (std::begin (scopeMid),  std::end (scopeMid),  0.0f);
+    std::fill (std::begin (scopeSide), std::end (scopeSide), 0.0f);
+    scopeWritePos.store (0, std::memory_order_release);
 
     juce::dsp::ProcessSpec spec { sampleRate, (juce::uint32) samplesPerBlock, (juce::uint32) numCh };
     dryDelay.prepare (spec);
@@ -347,6 +366,11 @@ void TekkChild670Processor::reset()
     dryDelay.reset();
     tapeBrain.reset();
     tapeSatMeter.store (0.0f);
+
+    sideGainSm.setCurrentAndTargetValue (1.0f);
+    std::fill (std::begin (scopeMid),  std::end (scopeMid),  0.0f);
+    std::fill (std::begin (scopeSide), std::end (scopeSide), 0.0f);
+    scopeWritePos.store (0, std::memory_order_release);
 
     for (int ch = 0; ch < 2; ++ch)
     {
@@ -785,6 +809,31 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
         }
     }
 
+    // Stereo Imager: Mono Maker collapses the side toward 0 (mono), Stereo
+    // Enhance scales it up (wider). Width = (1 + enhance) * (1 - mono), so
+    // 100 % Mono Maker is fully mono regardless of Enhance. Purist takes it out.
+    const float monoAmt = juce::jlimit (0.0f, 1.0f, pMonoMaker->load() * 0.01f);
+    const float enhAmt  = juce::jlimit (0.0f, 1.0f, pStereoEnh->load() * 0.01f);
+    const float targetSideGain = (1.0f + enhAmt) * (1.0f - monoAmt);
+    sideGainSm.setTargetValue (purist ? 1.0f : targetSideGain);
+
+    if (numCh >= 2 && (sideGainSm.isSmoothing() || std::abs (sideGainSm.getTargetValue() - 1.0f) > 1.0e-6f))
+    {
+        auto* L = buffer.getWritePointer (0);
+        auto* R = buffer.getWritePointer (1);
+        for (int i = 0; i < n; ++i)
+        {
+            const float mid  = 0.5f * (L[i] + R[i]);
+            const float side = 0.5f * (L[i] - R[i]) * sideGainSm.getNextValue();
+            L[i] = mid + side;
+            R[i] = mid - side;
+        }
+    }
+    else
+    {
+        sideGainSm.skip (n); // keep the smoother's clock advancing while bypassed
+    }
+
     // Safety: a gentle final ceiling so heavy Drive / saturation can't push overs
     if (pSafety->load() > 0.5f)
         for (int ch = 0; ch < numCh; ++ch)
@@ -798,6 +847,35 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
         outMeterDb[ch].store (juce::Decibels::gainToDecibels (buffer.getMagnitude (ch, 0, n), -100.0f));
     if (numCh == 1)
         outMeterDb[1].store (outMeterDb[0].load());
+
+    // Goniometer feed: publish the most recent mid/side of the true output.
+    {
+        const auto* L = buffer.getReadPointer (0);
+        const auto* R = numCh > 1 ? buffer.getReadPointer (1) : L;
+        int pos = scopeWritePos.load (std::memory_order_relaxed);
+        for (int i = 0; i < n; ++i)
+        {
+            scopeMid  [pos] = 0.5f * (L[i] + R[i]);
+            scopeSide [pos] = 0.5f * (L[i] - R[i]);
+            pos = (pos + 1) & (kScopeSize - 1);
+        }
+        scopeWritePos.store (pos, std::memory_order_release);
+    }
+}
+
+int TekkChild670Processor::getScopeData (float* midOut, float* sideOut, int maxN) const noexcept
+{
+    const int count = juce::jmin (maxN, kScopeSize);
+    int pos = scopeWritePos.load (std::memory_order_acquire);
+    // walk back 'count' samples so the newest pair lands at the end of the output
+    int idx = (pos - count) & (kScopeSize - 1);
+    for (int i = 0; i < count; ++i)
+    {
+        midOut[i]  = scopeMid[idx];
+        sideOut[i] = scopeSide[idx];
+        idx = (idx + 1) & (kScopeSize - 1);
+    }
+    return count;
 }
 
 //==============================================================================

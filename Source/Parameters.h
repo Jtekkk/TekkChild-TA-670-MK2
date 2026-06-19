@@ -46,6 +46,10 @@ inline constexpr const char* tapeNoise    = "tapenoise"; // 0..10
 inline constexpr const char* tapeXtalk    = "tapextalk"; // 0..10 crosstalk
 inline constexpr const char* tapeDegrade  = "tapedeg";   // 0..10
 
+// Stereo Imager ("TEKKVISION" CRT) section
+inline constexpr const char* monoMaker    = "monomaker"; // 0..100 % collapse toward mono
+inline constexpr const char* stereoEnhance = "stereoenh"; // 0..100 % widen the stereo field
+
 inline juce::String forChannel (const char* base, int channel)
 {
     return juce::String (base) + (channel == 0 ? "A" : "B");

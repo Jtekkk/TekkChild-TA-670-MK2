@@ -767,6 +767,82 @@ int main()
         setParam (proc, "compinA", 1.0f);
     }
 
+    // -- Stereo Imager (Mono Maker / Stereo Enhance) -------------------------
+    {
+        proc.reset();
+        setParam (proc, "bypass", 0.0f);
+        setParam (proc, "purist", 0.0f);
+        setParam (proc, "mode", 0.0f);
+        setParam (proc, "quality", 0.0f);
+        setParam (proc, "compinA", 0.0f); // colour off: isolate the imager
+        setParam (proc, "compinB", 0.0f);
+        setParam (proc, "tapeon", 0.0f);
+        setParam (proc, "inputA", 0.0f);
+        setParam (proc, "inputB", 0.0f);
+
+        // Feeds a decorrelated field (L = tone, R = silent -> non-zero side) and
+        // returns the output side-signal RMS in dB plus the largest |L-R|.
+        auto measureSide = [&] (float& maxLRdiff) -> double
+        {
+            juce::MidiBuffer midi;
+            const int blockSize = buffer.getNumSamples();
+            const int numBlocks = (int) std::ceil (0.4 * fs / blockSize);
+            const double inc = juce::MathConstants<double>::twoPi * 220.0 / fs;
+            double phase = 0.0, sumSide = 0.0; long count = 0; maxLRdiff = 0.0f;
+
+            for (int blk = 0; blk < numBlocks; ++blk)
+            {
+                for (int i = 0; i < blockSize; ++i)
+                {
+                    const float s = 0.5f * (float) std::sin (phase); phase += inc;
+                    buffer.setSample (0, i, s);
+                    buffer.setSample (1, i, 0.0f);
+                }
+                proc.processBlock (buffer, midi);
+                for (int i = 0; i < blockSize; ++i)
+                {
+                    if (blk < 8) continue; // let the width smoother settle (~30 ms)
+                    const float l = buffer.getSample (0, i), r = buffer.getSample (1, i);
+                    const float side = 0.5f * (l - r);
+                    sumSide += (double) side * side; ++count;
+                    maxLRdiff = std::max (maxLRdiff, std::abs (l - r));
+                }
+            }
+            return 10.0 * std::log10 (sumSide / (double) std::max (1L, count) + 1.0e-20);
+        };
+
+        float diff = 0.0f;
+        setParam (proc, "monomaker", 0.0f); setParam (proc, "stereoenh", 0.0f);
+        const double baseSide = measureSide (diff);
+
+        setParam (proc, "stereoenh", 100.0f);
+        const double wideSide = measureSide (diff);
+
+        setParam (proc, "stereoenh", 0.0f);
+        setParam (proc, "monomaker", 100.0f);
+        float monoDiff = 0.0f;
+        const double monoSide = measureSide (monoDiff);
+
+        expect (wideSide > baseSide + 2.0,
+                "Stereo Enhance widens the side signal (" + std::to_string (baseSide)
+                    + " -> " + std::to_string (wideSide) + " dB)");
+        expect (monoSide < baseSide - 20.0,
+                "Mono Maker at 100% collapses the side toward mono (" + std::to_string (monoSide) + " dB)");
+        expect (monoDiff < 1.0e-4f, "Mono Maker at 100% makes L == R");
+
+        // and the goniometer feed is alive and bounded
+        std::vector<float> sm (64), ss (64);
+        const int got = proc.getScopeData (sm.data(), ss.data(), 64);
+        bool scopeFinite = (got == 64);
+        for (int i = 0; i < got; ++i)
+            scopeFinite = scopeFinite && std::isfinite (sm[i]) && std::isfinite (ss[i]);
+        expect (scopeFinite, "Goniometer scope feed returns finite data");
+
+        setParam (proc, "monomaker", 0.0f);
+        setParam (proc, "compinA", 1.0f);
+        setParam (proc, "compinB", 1.0f);
+    }
+
     std::cout << "\n" << (failures == 0 ? "ALL TESTS PASSED" : "TESTS FAILED")
               << std::endl;
 

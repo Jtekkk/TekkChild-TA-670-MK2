@@ -168,6 +168,55 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TapeBrainPanel)
 };
 
+// Chunky vintage-TV control knob (dark knurled barrel + cream pointer + dial
+// scale), used for the CRT module's MONO MAKER and STEREO ENHANCE controls.
+class CrtLookAndFeel : public juce::LookAndFeel_V4
+{
+public:
+    void drawRotarySlider (juce::Graphics&, int x, int y, int width, int height,
+                           float sliderPosProportional, float rotaryStartAngle,
+                           float rotaryEndAngle, juce::Slider&) override;
+};
+
+// The "TEKKVISION" stereo-imaging module: an old CRT television whose screen is
+// a live green-phosphor goniometer (mono collapses it to a vertical line, width
+// spreads it horizontally with a red/cyan 3-D fringe). Two TV knobs underneath.
+class StereoImagerPanel : public juce::Component,
+                          private juce::Timer
+{
+public:
+    explicit StereoImagerPanel (TekkChild670Processor&);
+    ~StereoImagerPanel() override;
+
+    void paint (juce::Graphics&) override;
+    void resized() override;
+
+private:
+    using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
+
+    void timerCallback() override;
+    void drawScreen (juce::Graphics&, juce::Rectangle<float>);
+
+    TekkChild670Processor& processor;
+    CrtLookAndFeel crtLnf;
+
+    juce::Slider monoKnob, enhanceKnob;
+    juce::Label  monoLb, enhanceLb;
+    std::unique_ptr<SliderAttachment> monoAt, enhanceAt;
+
+    juce::Rectangle<int> screenArea, knobArea, brandArea;
+
+    // goniometer snapshot, refreshed on the UI timer
+    static constexpr int kScopeN = 512;
+    float scopeMid [kScopeN] {};
+    float scopeSide[kScopeN] {};
+    int   scopeCount = 0;
+    float scanPhase  = 0.0f;
+    float litLevel   = 0.0f; // smoothed brightness from recent signal energy
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (StereoImagerPanel)
+};
+
 } // namespace tekk
 
 //==============================================================================
@@ -192,6 +241,7 @@ private:
 
     tekk::ChannelStrip stripA, stripB;
     tekk::TapeBrainPanel tapePanel;
+    tekk::StereoImagerPanel imagerPanel;
 
     juce::Label    presetLb;
     juce::ComboBox presetBox;

@@ -993,6 +993,280 @@ void TapeBrainPanel::resized()
                                       { &hissLb, &noiseLb, &xtalkLb, &degradeLb, &outputLb });
 }
 
+//==============================================================================
+void CrtLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int width, int height,
+                                       float sliderPos, float startAngle, float endAngle, juce::Slider&)
+{
+    auto bounds = juce::Rectangle<int> (x, y, width, height).toFloat().reduced (4.0f);
+    const float size = juce::jmin (bounds.getWidth(), bounds.getHeight());
+    bounds = bounds.withSizeKeepingCentre (size, size);
+    const auto  c      = bounds.getCentre();
+    const float radius = size * 0.5f;
+    const float angle  = startAngle + sliderPos * (endAngle - startAngle);
+
+    // printed dial scale on the bezel ring
+    g.setColour (juce::Colour (0xffcfc7b0).withAlpha (0.8f));
+    const int ticks = 11;
+    for (int i = 0; i < ticks; ++i)
+    {
+        const float t  = (float) i / (float) (ticks - 1);
+        const float a  = startAngle + t * (endAngle - startAngle);
+        const auto  p1 = c.getPointOnCircumference (radius * 0.98f, a);
+        const auto  p2 = c.getPointOnCircumference (radius * 0.86f, a);
+        g.drawLine ({ p1, p2 }, (i == 0 || i == ticks - 1) ? 1.7f : 1.0f);
+    }
+
+    const float knobR = radius * 0.72f;
+    auto knob = juce::Rectangle<float> (knobR * 2.0f, knobR * 2.0f).withCentre (c);
+
+    g.setColour (juce::Colours::black.withAlpha (0.5f));
+    g.fillEllipse (knob.expanded (2.0f).translated (0.0f, 1.5f));
+
+    // knurled barrel: alternating light / dark ribs
+    g.setColour (juce::Colour (0xff2a2a2e));
+    g.fillEllipse (knob);
+    const int ribs = 24;
+    for (int i = 0; i < ribs; ++i)
+    {
+        const float a  = (float) i / (float) ribs * juce::MathConstants<float>::twoPi;
+        const auto  p1 = c.getPointOnCircumference (knobR, a);
+        const auto  p2 = c.getPointOnCircumference (knobR * 0.84f, a);
+        g.setColour ((i % 2) ? juce::Colour (0xff3c3c42) : juce::Colour (0xff141417));
+        g.drawLine ({ p1, p2 }, 2.2f);
+    }
+
+    // domed top face, lit from top-left
+    auto face = knob.reduced (knobR * 0.22f);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff4a4a52), face.getX(), face.getY(),
+                                             juce::Colour (0xff202024), face.getRight(), face.getBottom(), false));
+    g.fillEllipse (face);
+    g.setColour (juce::Colours::black.withAlpha (0.4f));
+    g.drawEllipse (face, 1.0f);
+    g.setColour (juce::Colours::white.withAlpha (0.12f));
+    g.drawEllipse (face.reduced (1.5f), 1.0f);
+
+    // cream pointer + phosphor-green tip lamp
+    juce::Path ptr;
+    ptr.addRoundedRectangle (-2.0f, -face.getWidth() * 0.5f + 2.0f, 4.0f, face.getWidth() * 0.42f, 2.0f);
+    g.setColour (juce::Colour (0xffe9e2cc));
+    g.fillPath (ptr, juce::AffineTransform::rotation (angle).translated (c));
+
+    const auto tip = c.getPointOnCircumference (face.getWidth() * 0.5f - 2.0f, angle);
+    g.setColour (juce::Colour (0xff7cfcb4));
+    g.fillEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre (tip));
+}
+
+//==============================================================================
+StereoImagerPanel::StereoImagerPanel (TekkChild670Processor& p)
+    : processor (p)
+{
+    auto setup = [this] (juce::Slider& s, juce::Label& l, const juce::String& name,
+                         const juce::String& pidStr, std::unique_ptr<SliderAttachment>& at)
+    {
+        s.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+        s.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 64, 15);
+        s.setLookAndFeel (&crtLnf);
+        addAndMakeVisible (s);
+
+        l.setText (name, juce::dontSendNotification);
+        l.setJustificationType (juce::Justification::centred);
+        l.setFont (juce::Font (juce::FontOptions (12.0f)).boldened());
+        l.setColour (juce::Label::textColourId, colours::cream);
+        addAndMakeVisible (l);
+
+        at = std::make_unique<SliderAttachment> (processor.apvts, pidStr, s);
+    };
+
+    setup (monoKnob,    monoLb,    "MONO MAKER",     pid::monoMaker,     monoAt);
+    setup (enhanceKnob, enhanceLb, "STEREO ENHANCE", pid::stereoEnhance, enhanceAt);
+
+    startTimerHz (30);
+}
+
+StereoImagerPanel::~StereoImagerPanel()
+{
+    monoKnob.setLookAndFeel (nullptr);
+    enhanceKnob.setLookAndFeel (nullptr);
+}
+
+void StereoImagerPanel::timerCallback()
+{
+    scopeCount = processor.getScopeData (scopeMid, scopeSide, kScopeN);
+
+    float e = 0.0f;
+    for (int i = 0; i < scopeCount; ++i)
+    {
+        e = std::max (e, std::abs (scopeMid[i]));
+        e = std::max (e, std::abs (scopeSide[i]));
+    }
+    const float target = juce::jlimit (0.0f, 1.0f, e * 1.4f);
+    litLevel += (target > litLevel ? 0.5f : 0.08f) * (target - litLevel);
+
+    scanPhase += 0.15f;
+    if (scanPhase > 1.0f) scanPhase -= 1.0f;
+
+    repaint();
+}
+
+void StereoImagerPanel::drawScreen (juce::Graphics& g, juce::Rectangle<float> area)
+{
+    // CRT plastic bezel around the glass
+    g.setColour (juce::Colour (0xff0a0a0c));
+    g.fillRoundedRectangle (area.expanded (6.0f), 16.0f);
+    g.setColour (juce::Colours::black.withAlpha (0.6f));
+    g.drawRoundedRectangle (area.expanded (6.0f), 16.0f, 2.0f);
+
+    juce::Path screen;
+    const float corner = juce::jmin (area.getWidth(), area.getHeight()) * 0.18f;
+    screen.addRoundedRectangle (area.getX(), area.getY(), area.getWidth(), area.getHeight(), corner);
+
+    juce::Graphics::ScopedSaveState ss (g);
+    g.reduceClipRegion (screen);
+
+    // dark phosphor with a soft centre glow
+    g.setColour (juce::Colour (0xff04130a));
+    g.fillRect (area);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff0c3a22), area.getCentreX(), area.getCentreY(),
+                                             juce::Colour (0xff02100a), area.getX(), area.getY(), true));
+    g.fillRect (area);
+
+    const auto  c     = area.getCentre();
+    const float scale = juce::jmin (area.getWidth(), area.getHeight()) * 0.46f;
+
+    // graticule: mono (vertical), L/R diagonals, range rings
+    g.setColour (juce::Colour (0xff2f8f5a).withAlpha (0.35f));
+    g.drawLine (c.x, area.getY() + 6.0f, c.x, area.getBottom() - 6.0f, 1.0f);
+    g.drawLine (c.x - scale, c.y - scale, c.x + scale, c.y + scale, 1.0f);
+    g.drawLine (c.x - scale, c.y + scale, c.x + scale, c.y - scale, 1.0f);
+    for (float rr = scale * 0.5f; rr <= scale + 0.5f; rr += scale * 0.5f)
+        g.drawEllipse (juce::Rectangle<float> (rr * 2.0f, rr * 2.0f).withCentre (c), 0.8f);
+
+    g.setColour (juce::Colour (0xff58c47e).withAlpha (0.6f));
+    g.setFont (juce::Font (juce::FontOptions (11.0f)).boldened());
+    g.drawText ("L", juce::Rectangle<float> (16, 14).withCentre ({ area.getX() + 12.0f, area.getY() + 11.0f }), juce::Justification::centred);
+    g.drawText ("R", juce::Rectangle<float> (16, 14).withCentre ({ area.getRight() - 12.0f, area.getY() + 11.0f }), juce::Justification::centred);
+    g.drawText ("M", juce::Rectangle<float> (16, 12).withCentre ({ c.x, area.getY() + 10.0f }), juce::Justification::centred);
+
+    // goniometer trace: x = side (width), y = mid (in-phase up)
+    const float enh    = processor.apvts.getRawParameterValue (pid::stereoEnhance)->load() * 0.01f;
+    const float fringe = 1.5f + enh * 4.5f;            // 3-D red/cyan split grows with enhance
+    const float bright = 0.25f + 0.75f * litLevel;
+
+    juce::Path trace;
+    bool started = false;
+    for (int i = 0; i < scopeCount; ++i)
+    {
+        const float xx = c.x + juce::jlimit (-1.2f, 1.2f, scopeSide[i]) * scale * 1.4f;
+        const float yy = c.y - juce::jlimit (-1.2f, 1.2f, scopeMid[i])  * scale * 1.1f;
+        if (! started) { trace.startNewSubPath (xx, yy); started = true; }
+        else            trace.lineTo (xx, yy);
+    }
+
+    if (started)
+    {
+        g.setColour (juce::Colour (0xffff3b3b).withAlpha (0.35f * bright));
+        g.strokePath (trace, juce::PathStrokeType (1.4f), juce::AffineTransform::translation (-fringe, 0.0f));
+        g.setColour (juce::Colour (0xff35e0ff).withAlpha (0.35f * bright));
+        g.strokePath (trace, juce::PathStrokeType (1.4f), juce::AffineTransform::translation (fringe, 0.0f));
+        g.setColour (juce::Colour (0xff7cfcb4).withAlpha (0.85f * bright));
+        g.strokePath (trace, juce::PathStrokeType (1.2f));
+    }
+
+    // scanlines + a rolling bright line
+    g.setColour (juce::Colours::black.withAlpha (0.18f));
+    for (float yy = area.getY(); yy < area.getBottom(); yy += 3.0f)
+        g.drawHorizontalLine ((int) yy, area.getX(), area.getRight());
+    g.setColour (juce::Colour (0xff7cfcb4).withAlpha (0.06f));
+    g.fillRect (area.getX(), area.getY() + scanPhase * area.getHeight(), area.getWidth(), 12.0f);
+
+    // vignette + glass sheen
+    g.setGradientFill (juce::ColourGradient (juce::Colours::transparentBlack, c.x, c.y,
+                                             juce::Colours::black.withAlpha (0.5f), area.getX(), area.getY(), true));
+    g.fillRect (area);
+    g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.10f), area.getX(), area.getY(),
+                                             juce::Colours::transparentBlack, area.getCentreX(), area.getCentreY(), false));
+    g.fillRect (area.withTrimmedBottom (area.getHeight() * 0.6f));
+}
+
+void StereoImagerPanel::paint (juce::Graphics& g)
+{
+    auto rF = getLocalBounds().toFloat().reduced (2.0f);
+
+    // vintage TV cabinet: warm dark wood, drop shadow
+    g.setColour (juce::Colours::black.withAlpha (0.45f));
+    g.fillRoundedRectangle (rF.translated (0.0f, 2.0f), 12.0f);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff4b3a2a), rF.getCentreX(), rF.getY(),
+                                             juce::Colour (0xff2b2018), rF.getCentreX(), rF.getBottom(), false));
+    g.fillRoundedRectangle (rF, 12.0f);
+
+    {
+        juce::Graphics::ScopedSaveState ss (g);
+        juce::Path clip; clip.addRoundedRectangle (rF, 12.0f);
+        g.reduceClipRegion (clip);
+        juce::Random wr (99);
+        for (float yy = rF.getY(); yy < rF.getBottom(); yy += 3.0f)
+        {
+            g.setColour (juce::Colours::black.withAlpha (0.04f + 0.03f * wr.nextFloat()));
+            g.drawHorizontalLine ((int) yy, rF.getX(), rF.getRight());
+        }
+    }
+
+    g.setColour (juce::Colour (0xff6a5238).withAlpha (0.6f));
+    g.drawRoundedRectangle (rF.reduced (2.0f), 10.0f, 1.4f);
+    g.setColour (juce::Colour (0xff1a130d));
+    g.drawRoundedRectangle (rF, 12.0f, 2.0f);
+
+    // brand plate + power LED
+    {
+        auto t = brandArea.toFloat();
+        g.setFont (juce::Font (juce::FontOptions (15.0f)).boldened());
+        g.setColour (juce::Colours::black.withAlpha (0.5f));
+        g.drawText ("TEKKVISION  -  STEREO FIELD", t.translated (1.0f, 1.0f), juce::Justification::centred);
+        g.setColour (juce::Colour (0xffd8c8a0));
+        g.drawText ("TEKKVISION  -  STEREO FIELD", t, juce::Justification::centred);
+
+        auto led = juce::Rectangle<float> (8.0f, 8.0f).withCentre ({ t.getRight() - 4.0f, t.getCentreY() });
+        g.setColour (juce::Colour (0xffff5a3a).withAlpha (0.4f));
+        g.fillEllipse (led.expanded (3.0f));
+        g.setColour (juce::Colour (0xffff6a4a));
+        g.fillEllipse (led);
+        g.setColour (juce::Colours::white.withAlpha (0.6f));
+        g.fillEllipse (led.getX() + 2.0f, led.getY() + 1.5f, 2.5f, 2.0f);
+    }
+
+    drawScreen (g, screenArea.toFloat());
+
+    // recessed knob shelf
+    auto kb = knobArea.toFloat().reduced (2.0f);
+    g.setColour (juce::Colours::black.withAlpha (0.25f));
+    g.fillRoundedRectangle (kb, 8.0f);
+
+    const float ins = 13.0f;
+    drawScrew (g, rF.getX() + ins,     rF.getY() + ins,      4.5f, 20.0f);
+    drawScrew (g, rF.getRight() - ins, rF.getY() + ins,      4.5f, -30.0f);
+    drawScrew (g, rF.getX() + ins,     rF.getBottom() - ins, 4.5f, 50.0f);
+    drawScrew (g, rF.getRight() - ins, rF.getBottom() - ins, 4.5f, 8.0f);
+}
+
+void StereoImagerPanel::resized()
+{
+    auto r = getLocalBounds().reduced (10);
+
+    brandArea = r.removeFromTop (24);
+    auto knobs = r.removeFromBottom (118);
+    knobArea = knobs;
+    screenArea = r.reduced (14, 8);
+
+    const int kw = knobs.getWidth() / 2;
+    auto place = [] (juce::Rectangle<int> cell, juce::Slider& s, juce::Label& l)
+    {
+        l.setBounds (cell.removeFromBottom (16));
+        s.setBounds (cell.reduced (8, 2));
+    };
+    place (knobs.removeFromLeft (kw), monoKnob,    monoLb);
+    place (knobs,                     enhanceKnob, enhanceLb);
+}
+
 } // namespace tekk
 
 //==============================================================================
@@ -1001,13 +1275,15 @@ TekkChild670Editor::TekkChild670Editor (TekkChild670Processor& p)
       processor (p),
       stripA (p, 0, "CHANNEL A - LEFT / LAT"),
       stripB (p, 1, "CHANNEL B - RIGHT / VERT"),
-      tapePanel (p)
+      tapePanel (p),
+      imagerPanel (p)
 {
     setLookAndFeel (&lookAndFeel);
 
     addAndMakeVisible (stripA);
     addAndMakeVisible (stripB);
     addAndMakeVisible (tapePanel);
+    addAndMakeVisible (imagerPanel);
 
     auto setupGlobalBox = [this] (juce::ComboBox& box, juce::Label& label,
                                   const juce::String& text, const char* paramId)
@@ -1149,7 +1425,7 @@ TekkChild670Editor::TekkChild670Editor (TekkChild670Processor& p)
     refreshPresetBox();
     startTimerHz (8); // keep the box in step with host-driven program changes
 
-    setSize (1440, 668);
+    setSize (1840, 668);
 }
 
 void TekkChild670Editor::loadProgram (int index)
@@ -1317,6 +1593,32 @@ void TekkChild670Editor::paint (juce::Graphics& g)
         patch (0.40f, juce::Colour (0xff2ce0d2));
         patch (0.56f, juce::Colour (0xffd49a3a));
     }
+
+    // a cable carrying the output on into the CRT stereo imager
+    if (! imagerPanel.getBounds().isEmpty())
+    {
+        auto tb = tapePanel.getBounds().toFloat();
+        auto ib = imagerPanel.getBounds().toFloat();
+        const juce::Point<float> p0 (tb.getRight() - 6.0f, tb.getY() + tb.getHeight() * 0.50f);
+        const juce::Point<float> p1 (ib.getX() + 3.0f,     ib.getY() + ib.getHeight() * 0.46f);
+
+        juce::Path path;
+        path.startNewSubPath (p0);
+        const float dx = (p1.x - p0.x) * 0.5f;
+        path.cubicTo (p0.translated (dx, 12.0f), p1.translated (-dx, 12.0f), p1);
+        g.setColour (juce::Colours::black.withAlpha (0.45f));
+        g.strokePath (path, juce::PathStrokeType (6.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.setColour (juce::Colour (0xff7cfcb4));
+        g.strokePath (path, juce::PathStrokeType (4.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+        for (auto pt : { p0, p1 })
+        {
+            g.setColour (juce::Colour (0xff2a2a30));
+            g.fillRoundedRectangle (juce::Rectangle<float> (11.0f, 8.0f).withCentre (pt), 2.0f);
+            g.setColour (juce::Colour (0xffbfc3c9));
+            g.drawRoundedRectangle (juce::Rectangle<float> (11.0f, 8.0f).withCentre (pt), 2.0f, 1.0f);
+        }
+    }
 }
 
 void TekkChild670Editor::resized()
@@ -1327,7 +1629,9 @@ void TekkChild670Editor::resized()
     auto r = getLocalBounds();
     r.removeFromTop (52); // header, painted
 
-    // Tape Brain: a tall module bolted to the right, below the header.
+    // Stereo Imager (CRT TV) and Tape Brain: tall modules bolted to the right.
+    auto imagerArea = r.removeFromRight (400);
+    imagerPanel.setBounds (imagerArea.reduced (10, 8));
     auto tapeArea = r.removeFromRight (468);
     tapePanel.setBounds (tapeArea.reduced (10, 8));
 

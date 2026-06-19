@@ -62,6 +62,11 @@ public:
     // Tape Brain saturation level (0..1) for its VU meter.
     float getTapeSaturation() const noexcept { return tapeSatMeter.load(); }
 
+    // Stereo Imager goniometer feed. Copies up to maxN of the most recent
+    // mid/side sample pairs (newest last) into the caller's buffers and returns
+    // the count. Lock-free best-effort: a benign race only flickers the scope.
+    int getScopeData (float* midOut, float* sideOut, int maxN) const noexcept;
+
     // Hidden easter egg: the editor calls this (from the message thread) when
     // the mascot's nose is clicked six times; it plays the embedded clip once.
     void triggerEasterEgg();
@@ -93,6 +98,18 @@ private:
     tekk::TapeBrain tapeBrain;
     juce::AudioBuffer<float> tapeBuffer; // parallel-path scratch
     std::atomic<float> tapeSatMeter { 0.0f };
+
+    // Stereo Imager: Mono Maker + Stereo Enhance act on the side signal. The
+    // side gain is smoothed so width moves glide instead of zippering.
+    juce::SmoothedValue<float> sideGainSm;
+
+    // Goniometer ring: the audio thread writes the post-imaging mid/side here;
+    // the editor's CRT reads the most recent window. Plain arrays published via
+    // an atomic write index (single producer / single consumer).
+    static constexpr int kScopeSize = 512; // power of two for cheap masking
+    float scopeMid  [kScopeSize] {};
+    float scopeSide [kScopeSize] {};
+    std::atomic<int> scopeWritePos { 0 };
 
     juce::SmoothedValue<float> inputGainSm[2], outputGainSm[2], mixSm[2], dryGainSm[2];
 
@@ -161,6 +178,10 @@ private:
     std::atomic<float>* pTapeNoise {};
     std::atomic<float>* pTapeXtalk {};
     std::atomic<float>* pTapeDeg {};
+
+    // stereo imager
+    std::atomic<float>* pMonoMaker {};
+    std::atomic<float>* pStereoEnh {};
 
     float characterCurrent = 1.0f; // smoothed tube/transformer drive scaler
 
