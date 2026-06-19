@@ -124,6 +124,50 @@ private:
     juce::uint32 lastClickMs = 0;
 };
 
+// A Frankenstein knife-throw switch: lever down = SERIES, up = PARALLEL.
+class ThrowSwitch : public juce::Button
+{
+public:
+    ThrowSwitch() : juce::Button ("route") { setClickingTogglesState (true); }
+    void paintButton (juce::Graphics&, bool highlighted, bool down) override;
+};
+
+// The "Tape Brain" tape-effects section: a brass panel of tape knobs, a
+// TAPE SATURATION VU, the throw switch, and a glowing TAPE BRAIN jar.
+class TapeBrainPanel : public juce::Component,
+                       private juce::Timer
+{
+public:
+    explicit TapeBrainPanel (TekkChild670Processor&);
+
+    void paint (juce::Graphics&) override;
+    void resized() override;
+
+private:
+    using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
+    using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
+
+    void timerCallback() override;
+    void setupKnob (juce::Slider&, juce::Label&, const juce::String& name, const juce::String& pid);
+
+    TekkChild670Processor& processor;
+
+    juce::Slider drive, sat, bias, wow, hiss, noise, xtalk, degrade, input, output;
+    juce::Label  driveLb, satLb, biasLb, wowLb, hissLb, noiseLb, xtalkLb, degradeLb, inputLb, outputLb;
+
+    juce::ToggleButton powerBtn { "POWER" };
+    ThrowSwitch        routeSwitch;
+    juce::Image        chassis;
+
+    std::vector<std::unique_ptr<SliderAttachment>> knobAtts;
+    std::unique_ptr<ButtonAttachment> powerAt, routeAt;
+
+    juce::Rectangle<int> vuArea, jarArea, switchArea, nameArea;
+    float vuValue = 0.0f, jarPhase = 0.0f;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TapeBrainPanel)
+};
+
 } // namespace tekk
 
 //==============================================================================
@@ -147,6 +191,7 @@ private:
     tekk::TekkLookAndFeel lookAndFeel;
 
     tekk::ChannelStrip stripA, stripB;
+    tekk::TapeBrainPanel tapePanel;
 
     juce::Label    presetLb;
     juce::ComboBox presetBox;

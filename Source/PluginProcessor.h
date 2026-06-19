@@ -6,6 +6,7 @@
 #include <juce_dsp/juce_dsp.h>
 
 #include "DSP/Channel670.h"
+#include "DSP/TapeBrain.h"
 
 class TekkChild670Processor : public juce::AudioProcessor,
                               private juce::AsyncUpdater
@@ -58,6 +59,9 @@ public:
         return outMeterDb[clampCh (channel)].load();
     }
 
+    // Tape Brain saturation level (0..1) for its VU meter.
+    float getTapeSaturation() const noexcept { return tapeSatMeter.load(); }
+
     // Hidden easter egg: the editor calls this (from the message thread) when
     // the mascot's nose is clicked six times; it plays the embedded clip once.
     void triggerEasterEgg();
@@ -84,6 +88,11 @@ private:
 
     juce::AudioBuffer<float> dryBuffer;
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::None> dryDelay;
+
+    // Tape Brain: a tape-colour section after / in parallel with the compressor.
+    tekk::TapeBrain tapeBrain;
+    juce::AudioBuffer<float> tapeBuffer; // parallel-path scratch
+    std::atomic<float> tapeSatMeter { 0.0f };
 
     juce::SmoothedValue<float> inputGainSm[2], outputGainSm[2], mixSm[2], dryGainSm[2];
 
@@ -138,6 +147,20 @@ private:
     std::atomic<float>* pAutoMk {};
     std::atomic<float>* pSafety {};
     std::atomic<float>* pPurist {};
+
+    // tape brain
+    std::atomic<float>* pTapeOn {};
+    std::atomic<float>* pTapePar {};
+    std::atomic<float>* pTapeIn {};
+    std::atomic<float>* pTapeOut {};
+    std::atomic<float>* pTapeDrive {};
+    std::atomic<float>* pTapeSat {};
+    std::atomic<float>* pTapeBias {};
+    std::atomic<float>* pTapeWow {};
+    std::atomic<float>* pTapeHiss {};
+    std::atomic<float>* pTapeNoise {};
+    std::atomic<float>* pTapeXtalk {};
+    std::atomic<float>* pTapeDeg {};
 
     float characterCurrent = 1.0f; // smoothed tube/transformer drive scaler
 

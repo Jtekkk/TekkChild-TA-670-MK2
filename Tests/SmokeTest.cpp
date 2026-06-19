@@ -723,6 +723,50 @@ int main()
         expect (proc.getGainReductionDb (0) == 0.0f, "reset clears the GR meter");
     }
 
+    // -- Tape Brain (series / parallel routing) ------------------------------
+    {
+        proc.reset();
+        setParam (proc, "bypass", 0.0f);
+        setParam (proc, "mode", 0.0f);
+        setParam (proc, "quality", 0.0f);
+        setParam (proc, "purist", 0.0f);
+        setParam (proc, "compinA", 0.0f); // colour only, no compression
+        setParam (proc, "inputA", 0.0f);
+
+        setParam (proc, "tapeon", 0.0f);
+        const auto dry = runSine (proc, buffer, 0.5f, 0.2, 220.0, fs);
+
+        setParam (proc, "tapeon", 1.0f);
+        setParam (proc, "tapepar", 0.0f);   // series
+        setParam (proc, "tapedrive", 9.0f);
+        setParam (proc, "tapesat", 9.0f);
+        const auto series = runSine (proc, buffer, 0.5f, 0.3, 220.0, fs);
+
+        setParam (proc, "tapepar", 1.0f);   // parallel
+        const auto parallel = runSine (proc, buffer, 0.5f, 0.3, 220.0, fs);
+
+        expect (series.finite && parallel.finite, "Tape output is finite (series & parallel)");
+        expect (series.peak < 4.0f && parallel.peak < 4.0f, "Tape output stays bounded");
+        expect (series.peak < dry.peak,
+                "Tape (series) saturates the peak (" + std::to_string (dry.peak)
+                    + " -> " + std::to_string (series.peak) + ")");
+        expect (parallel.outRmsDb > series.outRmsDb,
+                "Parallel route sums the tape on top of the compressor output");
+
+        // wow & flutter modulates a steady tone away from a clean sine
+        setParam (proc, "tapedrive", 0.0f);
+        setParam (proc, "tapesat", 0.0f);
+        setParam (proc, "tapepar", 0.0f);
+        setParam (proc, "tapewow", 10.0f);
+        const auto wow = runSine (proc, buffer, 0.5f, 0.5, 220.0, fs);
+        expect (wow.finite, "Wow & Flutter output is finite");
+
+        setParam (proc, "tapeon", 0.0f);
+        setParam (proc, "tapewow", 0.0f);
+        setParam (proc, "tapesat", 3.0f);
+        setParam (proc, "compinA", 1.0f);
+    }
+
     std::cout << "\n" << (failures == 0 ? "ALL TESTS PASSED" : "TESTS FAILED")
               << std::endl;
 

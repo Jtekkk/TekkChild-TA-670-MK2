@@ -32,6 +32,20 @@ inline constexpr const char* safety     = "safety";     // output soft-clip ceil
 inline constexpr const char* purist    = "purist";  // takes the MK2 additions out of circuit
 inline constexpr const char* bypass    = "bypass";  // true bypass
 
+// Tape Brain section
+inline constexpr const char* tapeOn       = "tapeon";    // engage the tape section
+inline constexpr const char* tapeParallel = "tapepar";   // throw switch: false=series, true=parallel
+inline constexpr const char* tapeInput    = "tapein";    // dB
+inline constexpr const char* tapeOutput   = "tapeout";   // dB (also the parallel blend level)
+inline constexpr const char* tapeDrive    = "tapedrive"; // 0..10
+inline constexpr const char* tapeSat      = "tapesat";   // 0..10
+inline constexpr const char* tapeBias     = "tapebias";  // 0..10 (5 = nominal)
+inline constexpr const char* tapeWow      = "tapewow";   // 0..10 wow & flutter
+inline constexpr const char* tapeHiss     = "tapehiss";  // 0..10
+inline constexpr const char* tapeNoise    = "tapenoise"; // 0..10
+inline constexpr const char* tapeXtalk    = "tapextalk"; // 0..10 crosstalk
+inline constexpr const char* tapeDegrade  = "tapedeg";   // 0..10
+
 inline juce::String forChannel (const char* base, int channel)
 {
     return juce::String (base) + (channel == 0 ? "A" : "B");

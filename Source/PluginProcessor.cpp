@@ -58,6 +58,19 @@ TekkChild670Processor::TekkChild670Processor()
     pSafety     = apvts.getRawParameterValue (pid::safety);
     pPurist     = apvts.getRawParameterValue (pid::purist);
 
+    pTapeOn    = apvts.getRawParameterValue (pid::tapeOn);
+    pTapePar   = apvts.getRawParameterValue (pid::tapeParallel);
+    pTapeIn    = apvts.getRawParameterValue (pid::tapeInput);
+    pTapeOut   = apvts.getRawParameterValue (pid::tapeOutput);
+    pTapeDrive = apvts.getRawParameterValue (pid::tapeDrive);
+    pTapeSat   = apvts.getRawParameterValue (pid::tapeSat);
+    pTapeBias  = apvts.getRawParameterValue (pid::tapeBias);
+    pTapeWow   = apvts.getRawParameterValue (pid::tapeWow);
+    pTapeHiss  = apvts.getRawParameterValue (pid::tapeHiss);
+    pTapeNoise = apvts.getRawParameterValue (pid::tapeNoise);
+    pTapeXtalk = apvts.getRawParameterValue (pid::tapeXtalk);
+    pTapeDeg   = apvts.getRawParameterValue (pid::tapeDegrade);
+
     bypassParam = dynamic_cast<juce::AudioParameterBool*> (apvts.getParameter (pid::bypass));
     jassert (bypassParam != nullptr);
 }
@@ -181,6 +194,37 @@ juce::AudioProcessorValueTreeState::ParameterLayout TekkChild670Processor::creat
     layout.add (std::make_unique<j::AudioParameterBool> (
         j::ParameterID (pid::bypass, 1), "True Bypass", false));
 
+    // -- Tape Brain --
+    layout.add (std::make_unique<j::AudioParameterBool> (
+        j::ParameterID (pid::tapeOn, 1), "Tape Brain", false));
+    layout.add (std::make_unique<j::AudioParameterChoice> (
+        j::ParameterID (pid::tapeParallel, 1), "Tape Routing",
+        juce::StringArray { "Series", "Parallel" }, 0));
+
+    layout.add (std::make_unique<j::AudioParameterFloat> (
+        j::ParameterID (pid::tapeInput, 1), "Tape Input",
+        j::NormalisableRange<float> (-12.0f, 12.0f, 0.1f), 0.0f,
+        j::AudioParameterFloatAttributes().withLabel ("dB")));
+    layout.add (std::make_unique<j::AudioParameterFloat> (
+        j::ParameterID (pid::tapeOutput, 1), "Tape Output",
+        j::NormalisableRange<float> (-12.0f, 12.0f, 0.1f), 0.0f,
+        j::AudioParameterFloatAttributes().withLabel ("dB")));
+
+    auto tapeKnob = [&layout] (const char* id, const char* name, float dflt)
+    {
+        layout.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID (id, 1), name,
+            juce::NormalisableRange<float> (0.0f, 10.0f, 0.01f), dflt));
+    };
+    tapeKnob (pid::tapeDrive,   "Tape Drive",      0.0f);
+    tapeKnob (pid::tapeSat,     "Tape Saturation", 3.0f);
+    tapeKnob (pid::tapeBias,    "Tape Bias",       5.0f);
+    tapeKnob (pid::tapeWow,     "Wow & Flutter",   0.0f);
+    tapeKnob (pid::tapeHiss,    "Tape Hiss",       0.0f);
+    tapeKnob (pid::tapeNoise,   "Tape Noise",      0.0f);
+    tapeKnob (pid::tapeXtalk,   "Crosstalk",       0.0f);
+    tapeKnob (pid::tapeDegrade, "Degrade",         0.0f);
+
     return layout;
 }
 
@@ -199,6 +243,8 @@ void TekkChild670Processor::prepareToPlay (double sampleRate, int samplesPerBloc
     oversamplerFIR->initProcessing ((size_t) samplesPerBlock);
 
     dryBuffer.setSize (2, samplesPerBlock);
+    tapeBuffer.setSize (2, samplesPerBlock);
+    tapeBrain.prepare (sampleRate); // tape runs at base rate on the final output
 
     juce::dsp::ProcessSpec spec { sampleRate, (juce::uint32) samplesPerBlock, (juce::uint32) numCh };
     dryDelay.prepare (spec);
@@ -299,6 +345,8 @@ void TekkChild670Processor::reset()
     if (oversamplerIIR != nullptr) oversamplerIIR->reset();
     if (oversamplerFIR != nullptr) oversamplerFIR->reset();
     dryDelay.reset();
+    tapeBrain.reset();
+    tapeSatMeter.store (0.0f);
 
     for (int ch = 0; ch < 2; ++ch)
     {
@@ -675,6 +723,44 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
 
     grMeterDb[0].store (maxGr[0]);
     grMeterDb[1].store (numCh > 1 ? maxGr[1] : maxGr[0]);
+
+    // Tape Brain: a tape-colour section after (series) or alongside (parallel)
+    // the compressor. The throw switch picks the route; purist takes it out.
+    if (! purist && pTapeOn->load() > 0.5f)
+    {
+        tekk::TapeBrain::Params tp;
+        tp.inputGain  = juce::Decibels::decibelsToGain (pTapeIn->load());
+        tp.outputGain = juce::Decibels::decibelsToGain (pTapeOut->load());
+        tp.drive      = pTapeDrive->load() * 0.1f;
+        tp.saturation = pTapeSat->load()   * 0.1f;
+        tp.bias       = pTapeBias->load()  * 0.1f;
+        tp.wowFlutter = pTapeWow->load()   * 0.1f;
+        tp.hiss       = pTapeHiss->load()  * 0.1f;
+        tp.noise      = pTapeNoise->load() * 0.1f;
+        tp.crosstalk  = pTapeXtalk->load() * 0.1f;
+        tp.degrade    = pTapeDeg->load()   * 0.1f;
+        tapeBrain.setParams (tp);
+
+        // stereo working copy (mono duplicates the single channel)
+        for (int ch = 0; ch < 2; ++ch)
+            tapeBuffer.copyFrom (ch, 0, buffer, juce::jmin (ch, numCh - 1), 0, n);
+
+        tapeBrain.process (tapeBuffer.getWritePointer (0), tapeBuffer.getWritePointer (1), n);
+        tapeSatMeter.store (tapeBrain.saturationMeter());
+
+        const bool parallel = pTapePar->load() > 0.5f;
+        for (int ch = 0; ch < numCh; ++ch)
+        {
+            if (parallel)
+                buffer.addFrom (ch, 0, tapeBuffer, ch, 0, n);   // tape blended on top
+            else
+                buffer.copyFrom (ch, 0, tapeBuffer, ch, 0, n);  // tape in line
+        }
+    }
+    else
+    {
+        tapeSatMeter.store (0.0f);
+    }
 
     // easter egg: mix the embedded clip on top of the output once armed
     if (eggArm.exchange (false))
