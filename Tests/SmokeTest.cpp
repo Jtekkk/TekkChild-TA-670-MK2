@@ -843,6 +843,41 @@ int main()
         setParam (proc, "compinB", 1.0f);
     }
 
+    // -- 1176 brick-wall limiter (speed limit / throttle) --------------------
+    {
+        proc.reset();
+        setParam (proc, "bypass", 0.0f);
+        setParam (proc, "purist", 0.0f);
+        setParam (proc, "mode", 0.0f);
+        setParam (proc, "quality", 0.0f);
+        setParam (proc, "compinA", 0.0f); // isolate the limiter
+        setParam (proc, "compinB", 0.0f);
+        setParam (proc, "tapeon", 0.0f);
+        setParam (proc, "safety", 0.0f);
+        setParam (proc, "inputA", 0.0f);
+        setParam (proc, "inputB", 0.0f);
+
+        setParam (proc, "limthrottle", 100.0f);             // open road
+        const auto open  = runSine (proc, buffer, 0.5f, 0.3, 220.0, fs);
+        const float grOpen = proc.getLimiterGR();
+
+        setParam (proc, "limthrottle", 10.0f);              // low speed limit
+        const auto limited = runSine (proc, buffer, 0.5f, 0.3, 220.0, fs);
+        const float grLim = proc.getLimiterGR();
+
+        expect (open.finite && limited.finite, "Limiter output is finite");
+        expect (grOpen < 0.5f, "Throttle 100 (open road) is transparent (GR " + std::to_string (grOpen) + " dB)");
+        expect (limited.peak < open.peak * 0.5f,
+                "Low speed limit clamps the peak (" + std::to_string (open.peak)
+                    + " -> " + std::to_string (limited.peak) + ")");
+        expect (grLim > 6.0f, "Low speed limit shows gain reduction (" + std::to_string (grLim) + " dB)");
+        expect (limited.peak < 1.0f, "Limiter holds the output under full scale");
+
+        setParam (proc, "limthrottle", 100.0f);
+        setParam (proc, "compinA", 1.0f);
+        setParam (proc, "compinB", 1.0f);
+    }
+
     std::cout << "\n" << (failures == 0 ? "ALL TESTS PASSED" : "TESTS FAILED")
               << std::endl;
 

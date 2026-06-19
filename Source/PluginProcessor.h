@@ -62,6 +62,9 @@ public:
     // Tape Brain saturation level (0..1) for its VU meter.
     float getTapeSaturation() const noexcept { return tapeSatMeter.load(); }
 
+    // 1176 limiter gain reduction (dB, >= 0) for its meter.
+    float getLimiterGR() const noexcept { return limGrMeter.load(); }
+
     // Stereo Imager goniometer feed. Copies up to maxN of the most recent
     // mid/side sample pairs (newest last) into the caller's buffers and returns
     // the count. Lock-free best-effort: a benign race only flickers the scope.
@@ -182,6 +185,12 @@ private:
     // stereo imager
     std::atomic<float>* pMonoMaker {};
     std::atomic<float>* pStereoEnh {};
+
+    // 1176 limiter
+    std::atomic<float>* pLimitThrottle {};
+    float limiterGain = 1.0f;           // current brick-wall gain (instant attack)
+    float limRelCoef  = 0.0f;           // per-sample release coefficient
+    std::atomic<float> limGrMeter { 0.0f };
 
     float characterCurrent = 1.0f; // smoothed tube/transformer drive scaler
 

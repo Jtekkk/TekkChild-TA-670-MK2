@@ -74,6 +74,8 @@ TekkChild670Processor::TekkChild670Processor()
     pMonoMaker = apvts.getRawParameterValue (pid::monoMaker);
     pStereoEnh = apvts.getRawParameterValue (pid::stereoEnhance);
 
+    pLimitThrottle = apvts.getRawParameterValue (pid::limitThrottle);
+
     bypassParam = dynamic_cast<juce::AudioParameterBool*> (apvts.getParameter (pid::bypass));
     jassert (bypassParam != nullptr);
 }
@@ -238,6 +240,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout TekkChild670Processor::creat
         j::NormalisableRange<float> (0.0f, 100.0f, 0.1f), 0.0f,
         j::AudioParameterFloatAttributes().withLabel ("%")));
 
+    // -- 1176 limiter (speed limit / throttle) --
+    layout.add (std::make_unique<j::AudioParameterFloat> (
+        j::ParameterID (pid::limitThrottle, 1), "Speed Limit",
+        j::NormalisableRange<float> (0.0f, 100.0f, 1.0f), 100.0f));
+
     return layout;
 }
 
@@ -261,6 +268,11 @@ void TekkChild670Processor::prepareToPlay (double sampleRate, int samplesPerBloc
 
     sideGainSm.reset (sampleRate, 0.03);
     sideGainSm.setCurrentAndTargetValue (1.0f);
+
+    // 1176 limiter: instant attack, ~120 ms program release
+    limiterGain = 1.0f;
+    limRelCoef  = 1.0f - std::exp (-1.0f / (0.12f * (float) sampleRate));
+    limGrMeter.store (0.0f);
     std::fill (std::begin (scopeMid),  std::end (scopeMid),  0.0f);
     std::fill (std::begin (scopeSide), std::end (scopeSide), 0.0f);
     scopeWritePos.store (0, std::memory_order_release);
@@ -371,6 +383,9 @@ void TekkChild670Processor::reset()
     std::fill (std::begin (scopeMid),  std::end (scopeMid),  0.0f);
     std::fill (std::begin (scopeSide), std::end (scopeSide), 0.0f);
     scopeWritePos.store (0, std::memory_order_release);
+
+    limiterGain = 1.0f;
+    limGrMeter.store (0.0f);
 
     for (int ch = 0; ch < 2; ++ch)
     {
@@ -832,6 +847,41 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
     else
     {
         sideGainSm.skip (n); // keep the smoother's clock advancing while bypassed
+    }
+
+    // 1176 limiter: a brick-wall peak limiter whose ceiling is the "speed limit".
+    // 100 % = open road (ceiling above full scale, transparent); lower clamps the
+    // peaks harder. Instant attack (no overshoot), smooth program release. Linked
+    // across channels so the stereo image is preserved. Purist takes it out.
+    {
+        const float throttle = juce::jlimit (0.0f, 100.0f, pLimitThrottle->load()) * 0.01f;
+        const float threshDb = juce::jmap (throttle, 0.0f, 1.0f, -36.0f, 6.0f);
+        const float thresh   = juce::Decibels::decibelsToGain (threshDb);
+
+        float minGain = 1.0f;
+        if (! purist)
+        {
+            for (int i = 0; i < n; ++i)
+            {
+                float peak = 0.0f;
+                for (int ch = 0; ch < numCh; ++ch)
+                    peak = std::max (peak, std::abs (buffer.getSample (ch, i)));
+
+                const float desired = (peak > thresh) ? (thresh / peak) : 1.0f;
+                if (desired < limiterGain) limiterGain = desired;                       // instant attack
+                else                       limiterGain += limRelCoef * (desired - limiterGain); // release
+
+                for (int ch = 0; ch < numCh; ++ch)
+                    buffer.getWritePointer (ch)[i] *= limiterGain;
+
+                minGain = std::min (minGain, limiterGain);
+            }
+        }
+        else
+        {
+            limiterGain = 1.0f;
+        }
+        limGrMeter.store (-juce::Decibels::gainToDecibels (minGain, -60.0f));
     }
 
     // Safety: a gentle final ceiling so heavy Drive / saturation can't push overs

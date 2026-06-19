@@ -132,13 +132,24 @@ public:
     void paintButton (juce::Graphics&, bool highlighted, bool down) override;
 };
 
-// The "Tape Brain" tape-effects section: a brass panel of tape knobs, a
-// TAPE SATURATION VU, the throw switch, and a glowing TAPE BRAIN jar.
+// Brushed-metal tape-machine knob ringed with glowing cyan tick marks.
+class TapeLookAndFeel : public juce::LookAndFeel_V4
+{
+public:
+    void drawRotarySlider (juce::Graphics&, int x, int y, int width, int height,
+                           float sliderPosProportional, float rotaryStartAngle,
+                           float rotaryEndAngle, juce::Slider&) override;
+};
+
+// The "Tape Brain" tape-effects section: a weathered brass "MAGNETIC MEMORY"
+// control unit (analog VU, cyan-ticked knobs, amber lamps) beside a tall glowing
+// jar whose brain is built from film reels and coiled tape, plus the throw switch.
 class TapeBrainPanel : public juce::Component,
                        private juce::Timer
 {
 public:
     explicit TapeBrainPanel (TekkChild670Processor&);
+    ~TapeBrainPanel() override;
 
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -151,6 +162,7 @@ private:
     void setupKnob (juce::Slider&, juce::Label&, const juce::String& name, const juce::String& pid);
 
     TekkChild670Processor& processor;
+    TapeLookAndFeel tapeLnf;
 
     juce::Slider drive, sat, bias, wow, hiss, noise, xtalk, degrade, input, output;
     juce::Label  driveLb, satLb, biasLb, wowLb, hissLb, noiseLb, xtalkLb, degradeLb, inputLb, outputLb;
@@ -221,6 +233,45 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (StereoImagerPanel)
 };
 
+// A metal gas pedal that tilts with the slider value (rotary slider).
+class PedalLookAndFeel : public juce::LookAndFeel_V4
+{
+public:
+    void drawRotarySlider (juce::Graphics&, int x, int y, int width, int height,
+                           float sliderPosProportional, float rotaryStartAngle,
+                           float rotaryEndAngle, juce::Slider&) override;
+};
+
+// The "1176" brick-wall limiter: a SPEED LIMIT road sign whose number follows
+// the throttle pedal, with a gain-reduction needle showing how hard it limits.
+class LimiterPanel : public juce::Component,
+                     private juce::Timer
+{
+public:
+    explicit LimiterPanel (TekkChild670Processor&);
+    ~LimiterPanel() override;
+
+    void paint (juce::Graphics&) override;
+    void resized() override;
+
+private:
+    using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
+
+    void timerCallback() override;
+
+    TekkChild670Processor& processor;
+    PedalLookAndFeel pedalLnf;
+
+    juce::Slider throttle;
+    std::unique_ptr<SliderAttachment> throttleAt;
+    GainReductionMeter grMeter;
+    juce::Label pedalLb;
+
+    juce::Rectangle<int> titleArea, signArea, meterArea, pedalArea;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (LimiterPanel)
+};
+
 } // namespace tekk
 
 //==============================================================================
@@ -246,6 +297,7 @@ private:
     tekk::ChannelStrip stripA, stripB;
     tekk::TapeBrainPanel tapePanel;
     tekk::StereoImagerPanel imagerPanel;
+    tekk::LimiterPanel limiterPanel;
 
     juce::Label    presetLb;
     juce::ComboBox presetBox;

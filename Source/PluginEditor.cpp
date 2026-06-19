@@ -511,192 +511,370 @@ const juce::Colour tapeTeal   { 0xff2ce0d2 };
 const juce::Colour tapeBrass  { 0xffd8b56f };
 const juce::Colour tapeBrassD { 0xff6e571f };
 
-// One supply / take-up reel: dark wound tape, brass flange, spokes, hub bolt.
-void paintReel (juce::Graphics& g, juce::Rectangle<float> b, float angle)
+// A classic film reel: metal disc with big round cut-outs and a hub.
+void paintFilmReel (juce::Graphics& g, juce::Rectangle<float> b, float angle)
 {
-    const auto c = b.getCentre();
+    const auto  c = b.getCentre();
+    const float R = b.getWidth() * 0.5f;
 
-    g.setColour (juce::Colours::black.withAlpha (0.5f));
-    g.fillEllipse (b.expanded (1.5f).translated (0.0f, 1.0f));
+    g.setColour (juce::Colours::black.withAlpha (0.45f));
+    g.fillEllipse (b.expanded (1.5f).translated (0.0f, 1.5f));
 
-    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff3a3a40), c.x, b.getY(),
-                                             juce::Colour (0xff131316), c.x, b.getBottom(), false));
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xffc6cad0), c.x - R * 0.5f, c.y - R * 0.5f,
+                                             juce::Colour (0xff44464c), c.x + R * 0.6f, c.y + R * 0.6f, true));
     g.fillEllipse (b);
-    g.setColour (juce::Colours::black.withAlpha (0.35f));
-    for (float rr = b.getWidth() * 0.46f; rr > b.getWidth() * 0.30f; rr -= 2.5f)
-        g.drawEllipse (juce::Rectangle<float> (rr * 2.0f, rr * 2.0f).withCentre (c), 0.6f);
+    g.setColour (juce::Colours::black.withAlpha (0.45f));
+    g.drawEllipse (b, 1.2f);
 
-    auto flange = b.reduced (b.getWidth() * 0.30f);
-    g.setGradientFill (juce::ColourGradient (tapeBrass.brighter (0.2f), flange.getX(), flange.getY(),
-                                             tapeBrassD, flange.getRight(), flange.getBottom(), false));
-    g.fillEllipse (flange);
-    g.setColour (juce::Colours::black.withAlpha (0.4f));
-    g.drawEllipse (flange, 1.0f);
-
-    g.setColour (tapeBrassD.darker (0.3f));
-    for (int i = 0; i < 3; ++i)
+    const int holes = 6;
+    for (int i = 0; i < holes; ++i)
     {
-        const float a = angle + (float) i * juce::MathConstants<float>::twoPi / 3.0f;
-        const auto p1 = c.getPointOnCircumference (b.getWidth() * 0.15f, a);
-        const auto p2 = c.getPointOnCircumference (b.getWidth() * 0.30f, a);
-        g.drawLine ({ p1, p2 }, 2.2f);
+        const float a  = angle + (float) i / (float) holes * juce::MathConstants<float>::twoPi;
+        const auto  hc = c.getPointOnCircumference (R * 0.58f, a);
+        const float hr = R * 0.21f;
+        juce::Rectangle<float> h (hr * 2.0f, hr * 2.0f);
+        h.setCentre (hc);
+        g.setColour (juce::Colour (0xff141519));
+        g.fillEllipse (h);
+        g.setColour (juce::Colours::white.withAlpha (0.10f));
+        g.drawEllipse (h.reduced (0.5f), 0.8f);
     }
 
-    g.setColour (juce::Colour (0xffe9dcb4));
-    g.fillEllipse (juce::Rectangle<float> (5.0f, 5.0f).withCentre (c));
-    g.setColour (juce::Colours::black.withAlpha (0.5f));
-    g.drawEllipse (juce::Rectangle<float> (5.0f, 5.0f).withCentre (c), 0.8f);
+    auto hub = b.reduced (R * 0.66f);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xffdfe2e7), hub.getX(), hub.getY(),
+                                             juce::Colour (0xff585a60), hub.getRight(), hub.getBottom(), false));
+    g.fillEllipse (hub);
+    g.setColour (juce::Colours::black.withAlpha (0.45f));
+    g.drawEllipse (hub, 1.0f);
+    g.setColour (juce::Colour (0xff202024));
+    g.fillEllipse (juce::Rectangle<float> (3.0f, 3.0f).withCentre (c));
 }
 
-// The centrepiece: a glowing teal brain in a bell jar, on a two-reel deck.
-void paintBrainJar (juce::Graphics& g, juce::Rectangle<float> area, float phase, bool powered)
+// A brain built from coiled magnetic tape with film reels nestled in the loops.
+void paintTapeBrain (juce::Graphics& g, juce::Rectangle<float> region, float phase, bool powered)
 {
-    drawRecess (g, area, 10.0f);
-
+    const auto  c     = region.getCentre();
     const float pulse = 0.5f + 0.5f * std::sin (phase);
+    const float lw = region.getWidth(), lh = region.getHeight();
 
-    auto inner = area.reduced (10.0f);
-    auto reelStrip = inner.removeFromBottom (inner.getHeight() * 0.30f);
+    // brain body: two overlapping lobes filling the region
+    juce::Path body;
+    const float lobeW = lw * 0.62f, lobeH = lh * 0.92f;
+    body.addEllipse (juce::Rectangle<float> (lobeW, lobeH).withCentre ({ c.x - lw * 0.16f, c.y }));
+    body.addEllipse (juce::Rectangle<float> (lobeW, lobeH).withCentre ({ c.x + lw * 0.16f, c.y }));
 
     if (powered)
     {
-        g.setGradientFill (juce::ColourGradient (
-            tapeTeal.withAlpha (0.10f + 0.22f * pulse), inner.getCentreX(), inner.getCentreY(),
-            juce::Colours::transparentBlack, inner.getCentreX(), inner.getY() - 12.0f, true));
-        g.fillRect (area);
+        g.setColour (juce::Colour (0xff3fd6c4));                 // bright teal base
+        g.fillPath (body);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xffb6fff7), c.x, c.y - lh * 0.05f,
+                                                 juce::Colour (0xff1ba293), c.x, region.getBottom(), true));
+        g.fillPath (body);
+        g.setColour (juce::Colour (0xffeaffff).withAlpha (0.30f + 0.18f * pulse));
+        g.fillEllipse (juce::Rectangle<float> (lw * 0.46f, lh * 0.32f).withCentre ({ c.x, c.y - lh * 0.08f }));
+    }
+    else
+    {
+        g.setColour (juce::Colour (0xff154f47));
+        g.fillPath (body);
     }
 
-    // jar base plate
-    auto baseEll = juce::Rectangle<float> (inner.getWidth() * 0.62f, 13.0f)
-                       .withCentre ({ inner.getCentreX(), inner.getBottom() - 3.0f });
-    g.setColour (juce::Colour (0xff2a2a30));
-    g.fillEllipse (baseEll);
-    g.setColour (juce::Colours::black.withAlpha (0.5f));
-    g.drawEllipse (baseEll, 1.0f);
+    // coiled-tape grooves over the body
+    std::vector<juce::Path> loops;
+    loops.reserve (16);
+    auto makeLoop = [&] (float cx, float cy, float rw, float rh, float ph)
+    {
+        juce::Path p;
+        const int seg = 64;
+        for (int i = 0; i <= seg; ++i)
+        {
+            const float t  = (float) i / (float) seg * juce::MathConstants<float>::twoPi;
+            const float rr = 1.0f + 0.16f * std::sin (t * 5.0f + ph);
+            const float x  = cx + std::cos (t) * rw * rr;
+            const float y  = cy + std::sin (t) * rh * rr;
+            if (i == 0) p.startNewSubPath (x, y); else p.lineTo (x, y);
+        }
+        p.closeSubPath();
+        loops.push_back (std::move (p));
+    };
+    for (int k = 0; k < 5; ++k)
+    {
+        const float f = 0.32f + 0.12f * (float) k;
+        makeLoop (c.x - lw * 0.15f, c.y, lw * f * 0.52f, lh * f * 0.48f, phase + (float) k * 0.4f);
+        makeLoop (c.x + lw * 0.15f, c.y, lw * f * 0.52f, lh * f * 0.48f, phase + 1.7f + (float) k * 0.4f);
+    }
 
-    // bell-jar glass envelope (rounded only at the dome)
-    auto jar = inner.withSizeKeepingCentre (inner.getWidth() * 0.62f, inner.getHeight() * 0.94f);
-    const float cR = jar.getWidth() * 0.5f;
+    {
+        juce::Graphics::ScopedSaveState ss (g);
+        g.reduceClipRegion (body);
+        const juce::Colour groove = powered ? juce::Colour (0xff0a7264) : juce::Colour (0xff0a352f);
+        for (const auto& p : loops) { g.setColour (groove.withAlpha (0.55f)); g.strokePath (p, juce::PathStrokeType (2.6f)); }
+        g.setColour (powered ? juce::Colour (0xffeaffff).withAlpha (0.9f) : tapeTeal.withAlpha (0.3f));
+        for (const auto& p : loops) g.strokePath (p, juce::PathStrokeType (1.1f));
+    }
+
+    // central fissure
+    g.setColour ((powered ? juce::Colour (0xff075248) : juce::Colour (0xff07241f)).withAlpha (0.7f));
+    g.drawLine (c.x, region.getY() + lh * 0.08f, c.x, region.getBottom() - lh * 0.08f, 1.8f);
+
+    // film reels nestled into the tangle
+    struct RP { float fx, fy, fs, sp; };
+    const RP reels[] = { { -0.18f, -0.20f, 0.26f,  1.0f }, {  0.20f, -0.04f, 0.28f, -1.0f },
+                         { -0.10f,  0.20f, 0.24f,  0.8f }, {  0.18f,  0.26f, 0.22f, -0.7f } };
+    for (const auto& rp : reels)
+    {
+        const float d = region.getWidth() * rp.fs;
+        juce::Rectangle<float> rb (d, d);
+        rb.setCentre (c.x + region.getWidth() * rp.fx, c.y + region.getHeight() * rp.fy);
+        paintFilmReel (g, rb, phase * rp.sp);
+    }
+}
+
+// The centrepiece: a tall lab jar lit cyan, the tape brain suspended inside.
+void paintBrainJar (juce::Graphics& g, juce::Rectangle<float> area, float phase, bool powered)
+{
+    const float pulse = 0.5f + 0.5f * std::sin (phase);
+
+    if (powered)
+    {
+        g.setGradientFill (juce::ColourGradient (tapeTeal.withAlpha (0.12f + 0.12f * pulse),
+                                                 area.getCentreX(), area.getCentreY(),
+                                                 juce::Colours::transparentBlack, area.getX(), area.getY(), true));
+        g.fillRoundedRectangle (area.expanded (5.0f), 12.0f);
+    }
+
+    auto jar  = area.reduced (5.0f);
+    auto lid  = jar.removeFromTop (jar.getHeight() * 0.085f);
+    auto base = jar.removeFromBottom (jar.getHeight() * 0.05f);
+
     juce::Path glass;
-    glass.addRoundedRectangle (jar.getX(), jar.getY(), jar.getWidth(), jar.getHeight(),
-                               cR, cR, true, true, false, false);
+    const float cr = jar.getWidth() * 0.16f;
+    glass.addRoundedRectangle (jar.getX(), jar.getY(), jar.getWidth(), jar.getHeight(), cr);
 
-    // brain, clipped inside the glass
+    if (powered)
+    {
+        g.setColour (juce::Colour (0xff0d5f56));
+        g.fillPath (glass);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff2db8a6), jar.getCentreX(), jar.getCentreY() + jar.getHeight() * 0.1f,
+                                                 juce::Colour (0xff083e37), jar.getCentreX(), jar.getY(), true));
+        g.fillPath (glass);
+    }
+    else
+    {
+        g.setColour (juce::Colour (0xff0a322d));
+        g.fillPath (glass);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff124a43), jar.getCentreX(), jar.getCentreY(),
+                                                 juce::Colour (0xff05231f), jar.getCentreX(), jar.getBottom(), true));
+        g.fillPath (glass);
+    }
+
     {
         juce::Graphics::ScopedSaveState ss (g);
         g.reduceClipRegion (glass);
 
-        auto brain = jar.reduced (jar.getWidth() * 0.14f);
-        brain = brain.withTrimmedTop (brain.getHeight() * 0.16f);
-        const float lobeW = brain.getWidth() * 0.60f;
-        const float lobeH = brain.getHeight() * 0.74f;
+        auto brainRegion = jar.reduced (jar.getWidth() * 0.05f, jar.getHeight() * 0.04f)
+                               .withTrimmedTop (jar.getHeight() * 0.22f);
+        paintTapeBrain (g, brainRegion, phase, powered);
 
-        g.setColour (tapeTeal.withAlpha (powered ? (0.30f + 0.25f * pulse) : 0.22f));
-        g.fillEllipse (brain.expanded (6.0f)); // glow bloom
-
-        auto drawLobe = [&] (float cx)
-        {
-            juce::Rectangle<float> lobe (lobeW, lobeH);
-            lobe.setCentre (cx, brain.getCentreY());
-            g.setGradientFill (juce::ColourGradient (tapeTeal.brighter (0.4f), lobe.getCentreX(), lobe.getY(),
-                                                     tapeTeal.darker (0.5f), lobe.getCentreX(), lobe.getBottom(), false));
-            g.fillEllipse (lobe);
-        };
-        drawLobe (brain.getCentreX() - lobeW * 0.26f);
-        drawLobe (brain.getCentreX() + lobeW * 0.26f);
-
-        g.setColour (tapeTeal.darker (0.7f).withAlpha (0.7f));
-        for (int i = 0; i < 5; ++i)
-        {
-            const float y = brain.getY() + brain.getHeight() * (0.20f + 0.15f * (float) i);
-            juce::Path w;
-            w.startNewSubPath (brain.getX() + 4.0f, y);
-            w.cubicTo (brain.getCentreX() - 8.0f, y - 6.0f,
-                       brain.getCentreX() + 8.0f, y + 6.0f,
-                       brain.getRight() - 4.0f, y);
-            g.strokePath (w, juce::PathStrokeType (1.4f));
-        }
-
-        g.setColour (tapeTeal.darker (0.8f).withAlpha (0.8f));
-        g.drawLine (brain.getCentreX(), brain.getY() + 2.0f, brain.getCentreX(), brain.getBottom() - 2.0f, 2.0f);
-
+        // electric arcs spidering down from the lid
         if (powered)
         {
-            g.setColour (juce::Colours::white.withAlpha (0.25f + 0.45f * pulse));
-            g.fillEllipse (brain.getCentreX() - 2.0f, brain.getY() + 1.0f, 4.0f, 4.0f);
+            juce::Random rnd ((int) (phase * 24.0f) + 11);
+            g.setColour (tapeTeal.withAlpha (0.45f + 0.4f * pulse));
+            for (int b = 0; b < 3; ++b)
+            {
+                juce::Path bolt;
+                float x = jar.getCentreX() + (rnd.nextFloat() - 0.5f) * jar.getWidth() * 0.7f;
+                float y = jar.getY() + 4.0f;
+                bolt.startNewSubPath (x, y);
+                for (int s = 0; s < 5; ++s)
+                {
+                    x += (rnd.nextFloat() - 0.5f) * 16.0f;
+                    y += jar.getHeight() * 0.05f;
+                    bolt.lineTo (x, y);
+                }
+                g.strokePath (bolt, juce::PathStrokeType (1.1f));
+            }
         }
+
+        // glowing "TAPE BRAIN" across the upper jar
+        auto tt = jar.withTrimmedTop (jar.getHeight() * 0.05f).removeFromTop (jar.getHeight() * 0.18f);
+        g.setFont (juce::Font (juce::FontOptions (jar.getWidth() * 0.165f)).boldened());
+        g.setColour (tapeTeal.withAlpha (0.45f));
+        g.drawText ("TAPE", tt.translated (0.0f, -jar.getHeight() * 0.0f).expanded (2.0f, 1.0f),
+                    juce::Justification::centredTop);
+        g.setColour (juce::Colour (0xffd6fcff));
+        g.drawText ("TAPE", tt, juce::Justification::centredTop);
+        auto tt2 = tt.translated (0.0f, jar.getWidth() * 0.17f);
+        g.setColour (tapeTeal.withAlpha (0.45f));
+        g.drawText ("BRAIN", tt2.expanded (2.0f, 1.0f), juce::Justification::centredTop);
+        g.setColour (juce::Colour (0xffd6fcff));
+        g.drawText ("BRAIN", tt2, juce::Justification::centredTop);
+
+        // condensation droplets on the glass
+        juce::Random dr (55);
+        for (int i = 0; i < 26; ++i)
+        {
+            const float x = jar.getX() + dr.nextFloat() * jar.getWidth();
+            const float y = jar.getY() + dr.nextFloat() * jar.getHeight();
+            const float s = 1.0f + dr.nextFloat() * 2.6f;
+            g.setColour (juce::Colours::white.withAlpha (0.10f));
+            g.fillEllipse (x, y, s, s * 1.3f);
+            g.setColour (juce::Colours::white.withAlpha (0.22f));
+            g.fillEllipse (x + 0.3f, y + 0.2f, s * 0.4f, s * 0.4f);
+        }
+
+        // left-side vertical sheen
+        g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.18f), jar.getX(), jar.getY(),
+                                                 juce::Colours::transparentBlack, jar.getX() + jar.getWidth() * 0.42f, jar.getY(), false));
+        g.fillPath (glass);
     }
 
-    // glass sheen + rim
-    g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.16f), jar.getX(), jar.getY(),
-                                             juce::Colours::transparentBlack, jar.getCentreX(), jar.getCentreY(), false));
-    g.fillPath (glass);
-    g.setColour (juce::Colours::white.withAlpha (0.10f));
-    g.strokePath (glass, juce::PathStrokeType (1.4f));
+    g.setColour (tapeTeal.withAlpha (0.45f));
+    g.strokePath (glass, juce::PathStrokeType (1.6f));
     g.setColour (juce::Colour (0xff0c0c0e));
     g.strokePath (glass, juce::PathStrokeType (0.8f));
 
-    // two reels on the deck, counter-rotating
-    auto reelArea = reelStrip.reduced (6.0f, 2.0f);
-    const float reelD = juce::jmin (reelArea.getHeight(), reelArea.getWidth() * 0.42f);
-    juce::Rectangle<float> lr (reelD, reelD), rr (reelD, reelD);
-    lr.setCentre (reelArea.getX() + reelD * 0.55f, reelArea.getCentreY());
-    rr.setCentre (reelArea.getRight() - reelD * 0.55f, reelArea.getCentreY());
+    // brass bolted lid
+    auto lidR = lid.expanded (4.0f, 0.0f);
+    g.setColour (juce::Colours::black.withAlpha (0.4f));
+    g.fillRoundedRectangle (lidR.translated (0.0f, 1.5f), 4.0f);
+    g.setGradientFill (juce::ColourGradient (tapeBrass.brighter (0.25f), lidR.getX(), lidR.getY(),
+                                             tapeBrassD, lidR.getX(), lidR.getBottom(), false));
+    g.fillRoundedRectangle (lidR, 4.0f);
+    g.setColour (juce::Colour (0xff2a2114));
+    g.drawRoundedRectangle (lidR, 4.0f, 1.2f);
+    const int bolts = 7;
+    for (int i = 0; i < bolts; ++i)
+        drawScrew (g, lidR.getX() + lidR.getWidth() * ((float) i + 0.5f) / (float) bolts,
+                   lidR.getCentreY(), 3.0f, 30.0f * (float) i);
 
-    g.setColour (juce::Colour (0xff1a1a1d));
-    g.drawLine (lr.getCentreX(), lr.getY() + 2.0f, rr.getCentreX(), rr.getY() + 2.0f, 2.0f);
-
-    paintReel (g, lr,  phase);
-    paintReel (g, rr, -phase * 1.3f);
+    // base plinth
+    g.setColour (juce::Colour (0xff241c12));
+    g.fillRoundedRectangle (base.expanded (3.0f, 0.0f), 4.0f);
+    g.setColour (tapeBrassD.withAlpha (0.6f));
+    g.drawRoundedRectangle (base.expanded (3.0f, 0.0f), 4.0f, 1.0f);
 }
 
-// Backlit vertical segment ladder for the TAPE SATURATION readout (value 0..1),
-// suited to the tall narrow window between the jar and the throw switch.
-void paintTapeVu (juce::Graphics& g, juce::Rectangle<float> r, float value)
+// Cream-faced analog VU for TAPE SATURATION (value 0..1), warm backlit.
+void paintTapeVu (juce::Graphics& g, juce::Rectangle<float> r, float value, bool powered)
 {
-    // engraved caption strip across the bottom
-    auto caption = r.removeFromBottom (14.0f);
-    drawRecess (g, r, 5.0f);
+    // brass bezel
+    g.setColour (juce::Colour (0xff2a2114));
+    g.fillRoundedRectangle (r.expanded (2.5f), 6.0f);
+    g.setColour (tapeBrass.withAlpha (0.5f));
+    g.drawRoundedRectangle (r.expanded (1.0f), 5.0f, 1.0f);
 
-    auto col = r.reduced (6.0f, 6.0f);
-    const int   segs    = 14;
-    const float segH    = col.getHeight() / (float) segs;
-    const float lit     = juce::jlimit (0.0f, 1.0f, value) * segs;
-
-    for (int i = 0; i < segs; ++i)
+    auto face = r.reduced (3.0f);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xfff4ead0), face.getCentreX(), face.getBottom(),
+                                             juce::Colour (0xffcdbb8c), face.getCentreX(), face.getY(), false));
+    g.fillRoundedRectangle (face, 3.0f);
+    if (powered)
     {
-        auto seg = juce::Rectangle<float> (col.getX(), col.getBottom() - (float) (i + 1) * segH + 1.0f,
-                                           col.getWidth(), segH - 2.0f);
-        const float frac = (float) i / (float) (segs - 1);
-        juce::Colour on = frac < 0.6f ? tapeTeal
-                                      : (frac < 0.85f ? juce::Colour (0xfff0a92e)
-                                                      : juce::Colour (0xffe2483a));
-        if ((float) i < lit)
-        {
-            g.setColour (on);
-            g.fillRoundedRectangle (seg, 1.5f);
-            g.setColour (on.withAlpha (0.35f));
-            g.fillRoundedRectangle (seg.expanded (1.5f, 0.0f), 1.5f); // bloom
-        }
-        else
-        {
-            g.setColour (on.withAlpha (0.10f)); // unlit ghost
-            g.fillRoundedRectangle (seg, 1.5f);
-        }
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xffffcf7a).withAlpha (0.5f), face.getCentreX(), face.getBottom(),
+                                                 juce::Colours::transparentBlack, face.getCentreX(), face.getY(), false));
+        g.fillRoundedRectangle (face, 3.0f);
     }
 
-    // glass sheen + bezel
-    g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.14f), r.getX(), r.getY(),
-                                             juce::Colours::transparentBlack, r.getRight(), r.getY(), false));
-    g.fillRoundedRectangle (r, 5.0f);
-    g.setColour (juce::Colour (0xff0c0c0e));
-    g.drawRoundedRectangle (r, 5.0f, 1.0f);
+    const juce::Point<float> pivot (face.getCentreX(), face.getBottom() - 3.0f);
+    const float len = face.getHeight() * 0.84f;
+    auto angleFor = [] (float v)
+    {
+        return juce::jmap (juce::jlimit (0.0f, 1.0f, v), -0.46f, 0.46f) * juce::MathConstants<float>::pi;
+    };
 
-    g.setColour (colours::cream);
-    g.setFont (juce::Font (juce::FontOptions (8.5f)).boldened());
-    g.drawText ("TAPE SAT", caption, juce::Justification::centred);
+    // scale arc, with a red zone at the top
+    g.setColour (juce::Colour (0xff5a4a2a));
+    for (float t = 0.0f; t <= 1.0f; t += 0.1f)
+    {
+        const float a  = angleFor (t);
+        const auto  p1 = pivot.getPointOnCircumference (len, a);
+        const auto  p2 = pivot.getPointOnCircumference (len - (std::fmod (t * 10.0f, 5.0f) < 0.5f ? 7.0f : 4.0f), a);
+        g.setColour (t > 0.75f ? juce::Colour (0xff9e2b1b) : juce::Colour (0xff5a4a2a));
+        g.drawLine ({ p1, p2 }, t > 0.75f ? 1.8f : 1.0f);
+    }
+
+    g.setColour (juce::Colour (0xff5a4a2a));
+    g.setFont (juce::Font (juce::FontOptions (8.0f)).boldened());
+    g.drawText ("TAPE SATURATION",
+                juce::Rectangle<float> (face.getWidth(), 10.0f).withCentre ({ face.getCentreX(), face.getCentreY() + face.getHeight() * 0.16f }),
+                juce::Justification::centred);
+
+    // needle + hub
+    const float a   = angleFor (value);
+    const auto  tip = pivot.getPointOnCircumference (len, a);
+    g.setColour (juce::Colours::black.withAlpha (0.3f));
+    g.drawLine ({ pivot.translated (1.0f, 1.0f), tip.translated (1.0f, 1.0f) }, 1.8f);
+    g.setColour (juce::Colour (0xff1c1c20));
+    g.drawLine ({ pivot, tip }, 1.8f);
+    g.setColour (juce::Colour (0xff3a2c18));
+    g.fillEllipse (juce::Rectangle<float> (7.0f, 7.0f).withCentre (pivot));
+
+    // glass sheen + inner frame
+    g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.28f), face.getX(), face.getY(),
+                                             juce::Colours::transparentBlack, face.getX(), face.getCentreY(), false));
+    g.fillRoundedRectangle (face.withTrimmedBottom (face.getHeight() * 0.55f), 3.0f);
+    g.setColour (juce::Colour (0xff100c06));
+    g.drawRoundedRectangle (face, 3.0f, 1.0f);
 }
 } // anonymous namespace
+
+//==============================================================================
+void TapeLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int width, int height,
+                                        float sliderPos, float startAngle, float endAngle, juce::Slider&)
+{
+    auto bounds = juce::Rectangle<int> (x, y, width, height).toFloat().reduced (3.0f);
+    const float size = juce::jmin (bounds.getWidth(), bounds.getHeight());
+    bounds = bounds.withSizeKeepingCentre (size, size);
+    const auto  c      = bounds.getCentre();
+    const float radius = size * 0.5f;
+    const float angle  = startAngle + sliderPos * (endAngle - startAngle);
+
+    // glowing cyan tick ring
+    const int ticks = 11;
+    for (int i = 0; i < ticks; ++i)
+    {
+        const float t  = (float) i / (float) (ticks - 1);
+        const float a  = startAngle + t * (endAngle - startAngle);
+        const auto  p1 = c.getPointOnCircumference (radius * 1.0f, a);
+        const auto  p2 = c.getPointOnCircumference (radius * 0.84f, a);
+        const bool  lit = a <= angle + 0.001f;
+        g.setColour (tapeTeal.withAlpha (lit ? 0.95f : 0.4f));
+        g.drawLine ({ p1, p2 }, (i == 0 || i == ticks - 1) ? 1.8f : 1.1f);
+    }
+
+    const float knobR = radius * 0.66f;
+    auto knob = juce::Rectangle<float> (knobR * 2.0f, knobR * 2.0f).withCentre (c);
+
+    g.setColour (juce::Colours::black.withAlpha (0.5f));
+    g.fillEllipse (knob.expanded (2.0f).translated (0.0f, 1.5f));
+
+    // brushed-steel barrel
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xffb6bac0), c.x - knobR * 0.5f, c.y - knobR * 0.5f,
+                                             juce::Colour (0xff43454b), c.x + knobR * 0.6f, c.y + knobR * 0.6f, true));
+    g.fillEllipse (knob);
+    for (int i = 0; i < 36; ++i) // fine radial brushing
+    {
+        const float a = (float) i / 36.0f * juce::MathConstants<float>::twoPi;
+        g.setColour (juce::Colours::white.withAlpha (0.04f));
+        g.drawLine ({ c.getPointOnCircumference (knobR * 0.45f, a), c.getPointOnCircumference (knobR * 0.96f, a) }, 0.6f);
+    }
+    g.setColour (juce::Colour (0xff17181c));
+    g.drawEllipse (knob, 1.4f);
+    g.setColour (juce::Colours::white.withAlpha (0.12f));
+    g.drawEllipse (knob.reduced (1.6f), 0.8f);
+
+    // pointer notch, lit cyan
+    juce::Path ptr;
+    ptr.addRoundedRectangle (-1.8f, -knobR + 3.0f, 3.6f, knobR * 0.5f, 1.6f);
+    g.setColour (juce::Colour (0xff8af6ff));
+    g.fillPath (ptr, juce::AffineTransform::rotation (angle).translated (c));
+
+    // centre cap
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff64666c), c.x, c.y - knobR * 0.3f,
+                                             juce::Colour (0xff232428), c.x, c.y + knobR * 0.3f, false));
+    g.fillEllipse (juce::Rectangle<float> (knobR * 0.5f, knobR * 0.5f).withCentre (c));
+}
 
 //==============================================================================
 // A Frankenstein knife-throw switch: blade down = SERIES, up = PARALLEL.
@@ -790,16 +968,16 @@ void ThrowSwitch::paintButton (juce::Graphics& g, bool highlighted, bool)
 TapeBrainPanel::TapeBrainPanel (TekkChild670Processor& p)
     : processor (p)
 {
-    setupKnob (input,   inputLb,   "INPUT",    pid::tapeInput);
-    setupKnob (drive,   driveLb,   "DRIVE",    pid::tapeDrive);
-    setupKnob (sat,     satLb,     "SAT",      pid::tapeSat);
-    setupKnob (bias,    biasLb,    "BIAS",     pid::tapeBias);
-    setupKnob (wow,     wowLb,     "WOW/FLUT", pid::tapeWow);
-    setupKnob (hiss,    hissLb,    "HISS",     pid::tapeHiss);
-    setupKnob (noise,   noiseLb,   "NOISE",    pid::tapeNoise);
-    setupKnob (xtalk,   xtalkLb,   "X-TALK",   pid::tapeXtalk);
-    setupKnob (degrade, degradeLb, "DEGRADE",  pid::tapeDegrade);
-    setupKnob (output,  outputLb,  "OUTPUT",   pid::tapeOutput);
+    setupKnob (sat,     satLb,     "SATURATION",    pid::tapeSat);
+    setupKnob (drive,   driveLb,   "DRIVE",         pid::tapeDrive);
+    setupKnob (hiss,    hissLb,    "HISS",          pid::tapeHiss);
+    setupKnob (wow,     wowLb,     "WOW & FLUTTER", pid::tapeWow);
+    setupKnob (noise,   noiseLb,   "NOISE",         pid::tapeNoise);
+    setupKnob (bias,    biasLb,    "BIAS",          pid::tapeBias);
+    setupKnob (xtalk,   xtalkLb,   "CROSSTALK",     pid::tapeXtalk);
+    setupKnob (degrade, degradeLb, "DEGRADE",       pid::tapeDegrade);
+    setupKnob (input,   inputLb,   "INPUT",         pid::tapeInput);
+    setupKnob (output,  outputLb,  "OUTPUT",        pid::tapeOutput);
 
     powerBtn.setTooltip ("Tape Brain - engage the magnetic tape colour section");
     addAndMakeVisible (powerBtn);
@@ -812,19 +990,23 @@ TapeBrainPanel::TapeBrainPanel (TekkChild670Processor& p)
     startTimerHz (30);
 }
 
+TapeBrainPanel::~TapeBrainPanel()
+{
+    for (auto* s : { &drive, &sat, &bias, &wow, &hiss, &noise, &xtalk, &degrade, &input, &output })
+        s->setLookAndFeel (nullptr);
+}
+
 void TapeBrainPanel::setupKnob (juce::Slider& s, juce::Label& l, const juce::String& name,
                                 const juce::String& pidStr)
 {
     s.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
-    s.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 56, 13);
+    s.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+    s.setLookAndFeel (&tapeLnf);
+    s.setPopupDisplayEnabled (true, true, this); // value bubble on drag
+    s.setTooltip (name);
     addAndMakeVisible (s);
 
-    l.setText (name, juce::dontSendNotification);
-    l.setJustificationType (juce::Justification::centred);
-    l.setFont (juce::Font (juce::FontOptions (10.5f)));
-    l.setColour (juce::Label::textColourId, colours::cream);
-    addAndMakeVisible (l);
-
+    juce::ignoreUnused (l); // names are painted as glowing labels in paint()
     knobAtts.push_back (std::make_unique<SliderAttachment> (processor.apvts, pidStr, s));
 }
 
@@ -843,9 +1025,10 @@ void TapeBrainPanel::timerCallback()
 void TapeBrainPanel::paint (juce::Graphics& g)
 {
     auto rF = getLocalBounds().toFloat().reduced (2.0f);
+    const bool on = powerBtn.getToggleState();
 
     if (chassis.getWidth() != getWidth() || chassis.getHeight() != getHeight())
-        chassis = makeHammeredMetal (getWidth(), getHeight(), juce::Colour (0xff6e5a34), 23);
+        chassis = makeHammeredMetal (getWidth(), getHeight(), juce::Colour (0xff6e5836), 23);
 
     g.setColour (juce::Colours::black.withAlpha (0.45f));
     g.fillRoundedRectangle (rF.translated (0.0f, 2.0f), 10.0f);
@@ -856,69 +1039,106 @@ void TapeBrainPanel::paint (juce::Graphics& g)
         clip.addRoundedRectangle (rF, 10.0f);
         g.reduceClipRegion (clip);
         g.drawImage (chassis, rF);
+        // grime: darker toward the edges for a weathered unit
         g.setGradientFill (juce::ColourGradient (juce::Colours::transparentBlack, rF.getCentreX(), rF.getCentreY(),
-                                                 juce::Colours::black.withAlpha (0.35f), rF.getX(), rF.getY(), true));
+                                                 juce::Colours::black.withAlpha (0.45f), rF.getX(), rF.getY(), true));
         g.fillRoundedRectangle (rF, 10.0f);
     }
 
-    // brass bevel frame + rivets
+    // brass bevel frame + a riveted border
     g.setColour (juce::Colour (0xff2a2114));
     g.drawRoundedRectangle (rF, 10.0f, 2.0f);
     g.setColour (tapeBrass.withAlpha (0.5f));
     g.drawRoundedRectangle (rF.reduced (2.5f), 8.0f, 1.0f);
-
-    const float ins = 14.0f;
-    drawScrew (g, rF.getX() + ins,     rF.getY() + ins,      5.0f, 18.0f);
-    drawScrew (g, rF.getRight() - ins, rF.getY() + ins,      5.0f, -30.0f);
-    drawScrew (g, rF.getX() + ins,     rF.getBottom() - ins, 5.0f, 60.0f);
-    drawScrew (g, rF.getRight() - ins, rF.getBottom() - ins, 5.0f, 8.0f);
-
-    // title with a pilot lamp
+    for (float fx = rF.getX() + 16.0f; fx < rF.getRight() - 10.0f; fx += 34.0f)
     {
-        auto t = nameArea.toFloat();
-        const bool on = powerBtn.getToggleState();
-
-        auto lamp = juce::Rectangle<float> (12.0f, 12.0f).withCentre ({ t.getX() + 9.0f, t.getCentreY() - 2.0f });
-        if (on)
-        {
-            g.setColour (tapeTeal.withAlpha (0.35f * (0.5f + 0.5f * std::sin (jarPhase))));
-            g.fillEllipse (lamp.expanded (6.0f));
-        }
-        g.setColour (juce::Colours::black.withAlpha (0.5f));
-        g.fillEllipse (lamp.expanded (2.0f));
-        g.setColour (on ? tapeTeal : juce::Colour (0xff0c3a37));
-        g.fillEllipse (lamp);
-        g.setColour (juce::Colours::white.withAlpha (0.5f));
-        g.fillEllipse (lamp.getX() + 3.0f, lamp.getY() + 2.5f, 3.0f, 2.5f);
-
-        auto textArea = t.withTrimmedLeft (26.0f);
-        g.setFont (juce::Font (juce::FontOptions (19.0f)).boldened());
-        g.setColour (juce::Colours::black.withAlpha (0.55f));
-        g.drawText ("TAPE BRAIN", textArea.translated (0.0f, 1.0f).withTrimmedBottom (9.0f),
-                    juce::Justification::centredLeft);
-        g.setColour (tapeTeal);
-        g.drawText ("TAPE BRAIN", textArea.withTrimmedBottom (9.0f), juce::Justification::centredLeft);
-
-        g.setFont (juce::Font (juce::FontOptions (9.0f)));
-        g.setColour (juce::Colour (0xffe7d6a8).withAlpha (0.8f));
-        g.drawText ("MAGNETIC COLOUR LAB", textArea.withTrimmedTop (t.getHeight() * 0.58f),
-                    juce::Justification::centredLeft);
+        drawScrew (g, fx, rF.getY() + 8.0f, 3.0f, 20.0f * fx);
+        drawScrew (g, fx, rF.getBottom() - 8.0f, 3.0f, 14.0f * fx);
+    }
+    for (float fy = rF.getY() + 40.0f; fy < rF.getBottom() - 30.0f; fy += 40.0f)
+    {
+        drawScrew (g, rF.getX() + 8.0f, fy, 3.0f, 30.0f * fy);
+        drawScrew (g, rF.getRight() - 8.0f, fy, 3.0f, 22.0f * fy);
     }
 
-    // the brain-in-a-jar emblem and the saturation VU
-    paintBrainJar (g, jarArea.toFloat(), jarPhase, powerBtn.getToggleState());
-    paintTapeVu  (g, vuArea.toFloat(),  vuValue);
+    // a little amber lamp, lit when powered
+    auto lamp = [&] (juce::Point<float> p, juce::Colour col, bool lit)
+    {
+        if (lit)
+        {
+            g.setColour (col.withAlpha (0.45f));
+            g.fillEllipse (juce::Rectangle<float> (15.0f, 15.0f).withCentre (p));
+        }
+        g.setColour (juce::Colours::black.withAlpha (0.5f));
+        g.fillEllipse (juce::Rectangle<float> (10.0f, 10.0f).withCentre (p));
+        g.setColour (lit ? col : col.darker (0.75f));
+        g.fillEllipse (juce::Rectangle<float> (8.0f, 8.0f).withCentre (p));
+        g.setColour (juce::Colours::white.withAlpha (0.6f));
+        g.fillEllipse (p.x - 1.6f, p.y - 2.2f, 2.6f, 2.0f);
+    };
 
-    // routing wires around the throw switch
+    // VU + a pair of amber lamps to its right
+    paintTapeVu (g, vuArea.toFloat(), vuValue, on);
+    {
+        auto v = vuArea.toFloat();
+        lamp ({ v.getRight() + 14.0f, v.getY() + 14.0f }, juce::Colour (0xffff8a1e), on);
+        lamp ({ v.getRight() + 14.0f, v.getY() + 34.0f }, juce::Colour (0xffff8a1e),
+              on && (0.5f + 0.5f * std::sin (jarPhase)) > 0.5f);
+    }
+
+    // glowing cyan labels above each knob
+    auto glowLabel = [&] (juce::Slider& s, const char* txt)
+    {
+        auto b  = s.getBounds().toFloat();
+        auto la = juce::Rectangle<float> (b.getX() - 14.0f, b.getY() - 15.0f, b.getWidth() + 28.0f, 13.0f);
+        g.setFont (juce::Font (juce::FontOptions (9.5f)).boldened());
+        g.setColour (tapeTeal.withAlpha (on ? 0.4f : 0.2f));
+        g.drawText (txt, la.expanded (1.2f, 0.6f), juce::Justification::centred);
+        g.setColour (on ? juce::Colour (0xff9bf7ff) : juce::Colour (0xff5f9aa0));
+        g.drawText (txt, la, juce::Justification::centred);
+    };
+    glowLabel (sat,   "SATURATION"); glowLabel (drive,  "DRIVE");
+    glowLabel (hiss,  "HISS");       glowLabel (wow,    "WOW & FLUTTER");
+    glowLabel (noise, "NOISE");      glowLabel (bias,   "BIAS");
+    glowLabel (xtalk, "CROSSTALK");  glowLabel (degrade,"DEGRADE");
+    glowLabel (input, "INPUT");      glowLabel (output, "OUTPUT");
+
+    // two amber/yellow lamps between the INPUT and OUTPUT knobs
+    {
+        auto bi = input.getBounds().toFloat();
+        auto bo = output.getBounds().toFloat();
+        const float y = (bi.getCentreY() + bo.getCentreY()) * 0.5f;
+        const float xm = (bi.getRight() + bo.getX()) * 0.5f;
+        lamp ({ xm - 7.0f, y }, juce::Colour (0xffff7a16), on);
+        lamp ({ xm + 7.0f, y }, juce::Colour (0xfff4d03a), on);
+    }
+
+    // engraved nameplate
+    {
+        auto np = nameArea.toFloat();
+        g.setColour (juce::Colour (0xff1a140c).withAlpha (0.85f));
+        g.fillRoundedRectangle (np, 3.0f);
+        g.setColour (tapeBrassD.withAlpha (0.7f));
+        g.drawRoundedRectangle (np, 3.0f, 1.0f);
+        g.setColour (tapeTeal.withAlpha (0.85f));
+        g.setFont (juce::Font (juce::FontOptions (10.0f)).boldened());
+        g.drawText ("MAGNETIC MEMORY", np.removeFromTop (np.getHeight() * 0.52f), juce::Justification::centred);
+        g.setColour (juce::Colour (0xffe7d6a8).withAlpha (0.7f));
+        g.setFont (juce::Font (juce::FontOptions (7.5f)));
+        g.drawText ("TAPE PROCESSOR UNIT   NO. 1176-A", np, juce::Justification::centred);
+    }
+
+    // the jar
+    paintBrainJar (g, jarArea.toFloat(), jarPhase, on);
+
+    // routing wires from the unit into the throw switch
     {
         auto sw = routeSwitch.getBounds().toFloat();
         const bool parallel = routeSwitch.getToggleState();
-        const bool on       = powerBtn.getToggleState();
 
-        const juce::Point<float> inGrommet  (sw.getX() - 13.0f, sw.getCentreY());
-        const juce::Point<float> parJaw     (sw.getCentreX(),   sw.getY() + 16.0f);
-        const juce::Point<float> serJaw     (sw.getCentreX(),   sw.getBottom() - 16.0f);
-        const juce::Point<float> outGrommet (sw.getCentreX(),   sw.getBottom() + 8.0f);
+        const juce::Point<float> inGrommet  (sw.getX() - 14.0f, sw.getCentreY());
+        const juce::Point<float> parJaw     (sw.getCentreX(),   sw.getY() + 14.0f);
+        const juce::Point<float> serJaw     (sw.getCentreX(),   sw.getBottom() - 14.0f);
 
         auto cable = [&] (juce::Point<float> p0, juce::Point<float> p1, bool live, juce::Colour col)
         {
@@ -932,65 +1152,54 @@ void TapeBrainPanel::paint (juce::Graphics& g)
             g.strokePath (path, juce::PathStrokeType (3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         };
 
-        auto grommet = [&] (juce::Point<float> pt)
-        {
-            g.setColour (juce::Colour (0xff2a2a30));
-            g.fillEllipse (juce::Rectangle<float> (9.0f, 9.0f).withCentre (pt));
-            g.setColour (juce::Colour (0xffbfc3c9));
-            g.drawEllipse (juce::Rectangle<float> (9.0f, 9.0f).withCentre (pt), 1.0f);
-        };
-
         cable (inGrommet, serJaw, ! parallel, juce::Colour (0xffff7a16));
         cable (inGrommet, parJaw,   parallel, tapeTeal);
-        cable (parallel ? parJaw : serJaw, outGrommet, true, tapeTeal);
-        grommet (inGrommet);
-        grommet (outGrommet);
+        g.setColour (juce::Colour (0xff2a2a30));
+        g.fillEllipse (juce::Rectangle<float> (9.0f, 9.0f).withCentre (inGrommet));
+        g.setColour (juce::Colour (0xffbfc3c9));
+        g.drawEllipse (juce::Rectangle<float> (9.0f, 9.0f).withCentre (inGrommet), 1.0f);
     }
 }
 
 void TapeBrainPanel::resized()
 {
-    auto r = getLocalBounds().reduced (12);
+    auto r = getLocalBounds().reduced (10);
 
-    // title band with POWER at the right
-    auto titleBand = r.removeFromTop (30);
-    powerBtn.setBounds (titleBand.removeFromRight (88).reduced (2, 4));
-    nameArea = titleBand;
+    // footer: POWER (left), nameplate (centre), throw switch (right)
+    auto footer = r.removeFromBottom (70);
+    powerBtn.setBounds (footer.removeFromLeft (96).reduced (6, 22));
+    routeSwitch.setBounds (footer.removeFromRight (104).reduced (6, 2));
+    switchArea = routeSwitch.getBounds();
+    nameArea = footer.reduced (6, 12);
 
-    // feature row: brain jar (left), VU + wiring gutter + throw switch (right)
-    auto feature = r.removeFromTop (188);
-    jarArea = feature.removeFromLeft (juce::roundToInt (feature.getWidth() * 0.46f)).reduced (4);
-    feature.removeFromLeft (6);
+    // control unit (left) | jar (right)
+    auto jarCol = r.removeFromRight (juce::roundToInt (r.getWidth() * 0.42f));
+    jarArea = jarCol.reduced (2);
+    r.removeFromRight (8);
+    auto control = r;
 
-    auto switchCol = feature.removeFromRight (110);
-    routeSwitch.setBounds (switchCol.reduced (6, 10));
-    switchArea = switchCol;
-    feature.removeFromRight (20); // wiring gutter
-    vuArea = feature.reduced (2, 12);
+    // VU across the top of the control unit (leave room for two lamps at right)
+    vuArea = control.removeFromTop (74).withTrimmedRight (26).reduced (2, 2);
+    control.removeFromTop (8);
 
-    r.removeFromTop (10);
-
-    // knob bank: 5 columns x 2 rows
-    auto placeRow = [] (juce::Rectangle<int> row,
-                        std::initializer_list<juce::Slider*> ss,
-                        std::initializer_list<juce::Label*> ls)
+    // five rows of two knobs, labels painted above each
+    juce::Slider* col1[] = { &sat,   &hiss, &noise, &xtalk,   &input };
+    juce::Slider* col2[] = { &drive, &wow,  &bias,  &degrade, &output };
+    const int rows = 5;
+    const int rowH = control.getHeight() / rows;
+    const int half = control.getWidth() / 2;
+    for (int i = 0; i < rows; ++i)
     {
-        const int cw = row.getWidth() / (int) ss.size();
-        auto s = ss.begin();
-        auto l = ls.begin();
-        for (size_t i = 0; i < ss.size(); ++i, ++s, ++l)
+        auto row = control.removeFromTop (rowH);
+        auto place = [] (juce::Rectangle<int> cell, juce::Slider& s)
         {
-            auto cell = row.removeFromLeft (cw);
-            (*l)->setBounds (cell.removeFromBottom (13));
-            (*s)->setBounds (cell.reduced (1));
-        }
-    };
-
-    const int rowH = juce::jmin (r.getHeight() / 2, 132);
-    placeRow (r.removeFromTop (rowH), { &input, &drive, &sat, &bias, &wow },
-                                      { &inputLb, &driveLb, &satLb, &biasLb, &wowLb });
-    placeRow (r.removeFromTop (rowH), { &hiss, &noise, &xtalk, &degrade, &output },
-                                      { &hissLb, &noiseLb, &xtalkLb, &degradeLb, &outputLb });
+            cell.removeFromTop (16);            // glowing label sits here
+            cell.removeFromBottom (4);
+            s.setBounds (cell.reduced (juce::jmax (4, (cell.getWidth() - cell.getHeight()) / 2), 0));
+        };
+        place (row.removeFromLeft (half), *col1[i]);
+        place (row, *col2[i]);
+    }
 }
 
 //==============================================================================
@@ -1321,6 +1530,170 @@ void StereoImagerPanel::resized()
     place (knobs,                     enhanceKnob, enhanceLb);
 }
 
+//==============================================================================
+void PedalLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int width, int height,
+                                         float sliderPos, float, float, juce::Slider&)
+{
+    auto b = juce::Rectangle<int> (x, y, width, height).toFloat().reduced (4.0f);
+
+    // hinge bracket bolted at the top
+    auto bracket = juce::Rectangle<float> (b.getWidth() * 0.5f, 12.0f).withCentre ({ b.getCentreX(), b.getY() + 7.0f });
+    g.setColour (juce::Colour (0xff202024));
+    g.fillRoundedRectangle (bracket, 3.0f);
+    tekk::drawScrew (g, bracket.getX() + 5.0f, bracket.getCentreY(), 2.5f, 20.0f);
+    tekk::drawScrew (g, bracket.getRight() - 5.0f, bracket.getCentreY(), 2.5f, -20.0f);
+
+    const juce::Point<float> pivot (b.getCentreX(), b.getY() + 9.0f);
+    const float len = b.getHeight() - 20.0f;
+    const float wdt = b.getWidth() * 0.6f;
+
+    // pressed pedal tilts forward (toward the floor)
+    const float ang = juce::jmap (sliderPos, juce::degreesToRadians (-6.0f), juce::degreesToRadians (32.0f));
+
+    juce::Graphics::ScopedSaveState ss (g);
+    g.addTransform (juce::AffineTransform::rotation (ang, pivot.x, pivot.y));
+
+    // arm
+    g.setColour (juce::Colour (0xff3a3c42));
+    g.fillRoundedRectangle (pivot.x - 4.0f, pivot.y, 8.0f, len * 0.4f, 2.0f);
+
+    // foot plate
+    auto plate = juce::Rectangle<float> (wdt, len * 0.62f).withCentre ({ pivot.x, pivot.y + len * 0.62f });
+    g.setColour (juce::Colours::black.withAlpha (0.4f));
+    g.fillRoundedRectangle (plate.translated (1.5f, 2.5f), 5.0f);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff8f9298), plate.getX(), plate.getY(),
+                                             juce::Colour (0xff34363c), plate.getRight(), plate.getBottom(), false));
+    g.fillRoundedRectangle (plate, 5.0f);
+    g.setColour (juce::Colour (0xff17181c));
+    g.drawRoundedRectangle (plate, 5.0f, 1.4f);
+
+    // rubber tread ridges
+    g.setColour (juce::Colour (0xff111114));
+    for (float ty = plate.getY() + 6.0f; ty < plate.getBottom() - 4.0f; ty += 7.0f)
+        g.fillRect (plate.getX() + 5.0f, ty, plate.getWidth() - 10.0f, 3.0f);
+    g.setColour (juce::Colours::white.withAlpha (0.10f));
+    for (float ty = plate.getY() + 9.0f; ty < plate.getBottom() - 4.0f; ty += 7.0f)
+        g.fillRect (plate.getX() + 5.0f, ty, plate.getWidth() - 10.0f, 1.0f);
+
+    // hinge bolt over the arm
+    g.setColour (juce::Colour (0xffbfc3c9));
+    g.fillEllipse (juce::Rectangle<float> (8.0f, 8.0f).withCentre (pivot));
+    g.setColour (juce::Colours::black.withAlpha (0.5f));
+    g.drawEllipse (juce::Rectangle<float> (8.0f, 8.0f).withCentre (pivot), 1.0f);
+}
+
+//==============================================================================
+LimiterPanel::LimiterPanel (TekkChild670Processor& p)
+    : processor (p),
+      grMeter ([&p] { return p.getLimiterGR(); })
+{
+    throttle.setSliderStyle (juce::Slider::RotaryVerticalDrag);
+    throttle.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+    throttle.setLookAndFeel (&pedalLnf);
+    throttle.setPopupDisplayEnabled (true, true, this);
+    throttle.setTooltip ("Throttle - the speed limit / brick-wall ceiling. 100 = open road, lower limits harder");
+    addAndMakeVisible (throttle);
+    throttleAt = std::make_unique<SliderAttachment> (processor.apvts, pid::limitThrottle, throttle);
+
+    pedalLb.setText ("THROTTLE", juce::dontSendNotification);
+    pedalLb.setJustificationType (juce::Justification::centred);
+    pedalLb.setFont (juce::Font (juce::FontOptions (12.0f)).boldened());
+    pedalLb.setColour (juce::Label::textColourId, colours::cream);
+    addAndMakeVisible (pedalLb);
+
+    addAndMakeVisible (grMeter);
+    startTimerHz (15); // refresh the sign number
+}
+
+LimiterPanel::~LimiterPanel()
+{
+    throttle.setLookAndFeel (nullptr);
+}
+
+void LimiterPanel::timerCallback()
+{
+    repaint (signArea); // keep the SPEED LIMIT number in step with the throttle
+}
+
+void LimiterPanel::paint (juce::Graphics& g)
+{
+    auto rF = getLocalBounds().toFloat().reduced (2.0f);
+
+    // dark instrument-panel chassis
+    g.setColour (juce::Colours::black.withAlpha (0.45f));
+    g.fillRoundedRectangle (rF.translated (0.0f, 2.0f), 10.0f);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff2a2c31), rF.getCentreX(), rF.getY(),
+                                             juce::Colour (0xff161619), rF.getCentreX(), rF.getBottom(), false));
+    g.fillRoundedRectangle (rF, 10.0f);
+    g.setColour (juce::Colour (0xff0e0e10));
+    g.drawRoundedRectangle (rF, 10.0f, 2.0f);
+    g.setColour (juce::Colours::white.withAlpha (0.06f));
+    g.drawRoundedRectangle (rF.reduced (2.5f), 8.0f, 1.0f);
+
+    const float ins = 13.0f;
+    drawScrew (g, rF.getX() + ins,     rF.getY() + ins,      4.5f, 20.0f);
+    drawScrew (g, rF.getRight() - ins, rF.getY() + ins,      4.5f, -30.0f);
+    drawScrew (g, rF.getX() + ins,     rF.getBottom() - ins, 4.5f, 55.0f);
+    drawScrew (g, rF.getRight() - ins, rF.getBottom() - ins, 4.5f, 8.0f);
+
+    // "1176" in teal above the sign
+    {
+        auto t = titleArea.toFloat();
+        g.setFont (juce::Font (juce::FontOptions (30.0f)).boldened());
+        g.setColour (juce::Colour (0xff2ce0d2).withAlpha (0.35f));
+        g.drawText ("1176", t.expanded (2.0f, 1.0f), juce::Justification::centred);
+        g.setColour (juce::Colour (0xff2ce0d2));
+        g.drawText ("1176", t, juce::Justification::centred);
+        g.setFont (juce::Font (juce::FontOptions (9.5f)).boldened());
+        g.setColour (colours::textDim);
+        g.drawText ("BRICK-WALL LIMITER", t.removeFromBottom (12.0f), juce::Justification::centred);
+    }
+
+    // the SPEED LIMIT sign
+    {
+        auto s = signArea.toFloat();
+        const int limit = juce::roundToInt (processor.apvts.getRawParameterValue (pid::limitThrottle)->load());
+
+        g.setColour (juce::Colours::black.withAlpha (0.4f));
+        g.fillRoundedRectangle (s.translated (0.0f, 3.0f), 10.0f); // drop shadow
+        g.setColour (juce::Colours::white);
+        g.fillRoundedRectangle (s, 10.0f);
+        g.setColour (juce::Colour (0xff111111));
+        g.drawRoundedRectangle (s.reduced (5.0f), 7.0f, 3.0f); // inner black border
+
+        auto txt = s.reduced (s.getWidth() * 0.12f, s.getHeight() * 0.07f);
+        g.setColour (juce::Colour (0xff111111));
+
+        auto head = txt.removeFromTop (txt.getHeight() * 0.40f);
+        g.setFont (juce::Font (juce::FontOptions (head.getHeight() * 0.42f)).boldened());
+        g.drawText ("SPEED", head.removeFromTop (head.getHeight() * 0.5f), juce::Justification::centred);
+        g.drawText ("LIMIT", head, juce::Justification::centred);
+
+        // big number, sized to fit both the width (up to 3 digits) and height
+        const float numFont = juce::jmin (txt.getHeight() * 0.82f, txt.getWidth() * 0.52f);
+        g.setFont (juce::Font (juce::FontOptions (numFont)).boldened());
+        g.drawText (juce::String (limit), txt, juce::Justification::centred);
+    }
+}
+
+void LimiterPanel::resized()
+{
+    auto r = getLocalBounds().reduced (12);
+
+    titleArea = r.removeFromTop (52);
+    r.removeFromTop (4);
+    auto pedalCol = r.removeFromRight (juce::roundToInt (r.getWidth() * 0.34f));
+    r.removeFromRight (6);
+
+    // sign on the left, pedal on the right; GR needle along the bottom
+    meterArea = r.removeFromBottom (96);
+    grMeter.setBounds (meterArea.reduced (2));
+    signArea = r.reduced (6, 4);
+
+    pedalLb.setBounds (pedalCol.removeFromBottom (18));
+    throttle.setBounds (pedalCol.reduced (4, 2));
+}
+
 } // namespace tekk
 
 //==============================================================================
@@ -1330,7 +1703,8 @@ TekkChild670Editor::TekkChild670Editor (TekkChild670Processor& p)
       stripA (p, 0, "CHANNEL A - LEFT / LAT"),
       stripB (p, 1, "CHANNEL B - RIGHT / VERT"),
       tapePanel (p),
-      imagerPanel (p)
+      imagerPanel (p),
+      limiterPanel (p)
 {
     setLookAndFeel (&lookAndFeel);
 
@@ -1338,6 +1712,7 @@ TekkChild670Editor::TekkChild670Editor (TekkChild670Processor& p)
     addAndMakeVisible (stripB);
     addAndMakeVisible (tapePanel);
     addAndMakeVisible (imagerPanel);
+    addAndMakeVisible (limiterPanel);
 
     auto setupGlobalBox = [this] (juce::ComboBox& box, juce::Label& label,
                                   const juce::String& text, const char* paramId)
@@ -1479,7 +1854,7 @@ TekkChild670Editor::TekkChild670Editor (TekkChild670Processor& p)
     refreshPresetBox();
     startTimerHz (8); // keep the box in step with host-driven program changes
 
-    setSize (1840, 668);
+    setSize (2160, 668);
 }
 
 void TekkChild670Editor::loadProgram (int index)
@@ -1683,7 +2058,9 @@ void TekkChild670Editor::resized()
     auto r = getLocalBounds();
     r.removeFromTop (52); // header, painted
 
-    // Stereo Imager (CRT TV) and Tape Brain: tall modules bolted to the right.
+    // 1176 limiter, Stereo Imager (CRT TV) and Tape Brain: modules bolted right.
+    auto limiterArea = r.removeFromRight (320);
+    limiterPanel.setBounds (limiterArea.reduced (10, 8));
     auto imagerArea = r.removeFromRight (400);
     imagerPanel.setBounds (imagerArea.reduced (10, 8));
     auto tapeArea = r.removeFromRight (468);

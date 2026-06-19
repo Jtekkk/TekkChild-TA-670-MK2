@@ -50,6 +50,9 @@ inline constexpr const char* tapeDegrade  = "tapedeg";   // 0..10
 inline constexpr const char* monoMaker    = "monomaker"; // 0..100 % collapse toward mono
 inline constexpr const char* stereoEnhance = "stereoenh"; // 0..100 % widen the stereo field
 
+// 1176 brick-wall limiter ("SPEED LIMIT" sign + throttle pedal)
+inline constexpr const char* limitThrottle = "limthrottle"; // 0..100 "speed limit": 100 = open, 0 = hard limit
+
 inline juce::String forChannel (const char* base, int channel)
 {
     return juce::String (base) + (channel == 0 ? "A" : "B");
