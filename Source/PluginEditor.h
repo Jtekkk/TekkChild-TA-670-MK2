@@ -206,7 +206,11 @@ private:
 
     juce::Rectangle<int> screenArea, knobArea, brandArea;
 
-    // goniometer snapshot, refreshed on the UI timer
+    // the mascot on the CRT: full-colour plus red / cyan channel copies so the
+    // face can be split into a 3-D anaglyph that grows with Stereo Enhance
+    juce::Image faceArt, faceRed, faceCyan;
+
+    // audio snapshot for the mouth waveform, refreshed on the UI timer
     static constexpr int kScopeN = 512;
     float scopeMid [kScopeN] {};
     float scopeSide[kScopeN] {};

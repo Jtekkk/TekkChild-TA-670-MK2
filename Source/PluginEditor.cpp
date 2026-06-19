@@ -994,6 +994,33 @@ void TapeBrainPanel::resized()
 }
 
 //==============================================================================
+// Copy of an image keeping only the chosen colour channels (alpha preserved).
+// Used to split the mascot into red / cyan layers for the CRT's 3-D anaglyph.
+static juce::Image makeChannelTint (const juce::Image& src, bool keepR, bool keepG, bool keepB)
+{
+    if (! src.isValid())
+        return {};
+
+    juce::Image s = src.convertedToFormat (juce::Image::ARGB);
+    juce::Image dst (juce::Image::ARGB, s.getWidth(), s.getHeight(), true);
+
+    juce::Image::BitmapData sd (s,   juce::Image::BitmapData::readOnly);
+    juce::Image::BitmapData dd (dst, juce::Image::BitmapData::writeOnly);
+
+    for (int y = 0; y < s.getHeight(); ++y)
+        for (int x = 0; x < s.getWidth(); ++x)
+        {
+            const auto c = sd.getPixelColour (x, y);
+            dd.setPixelColour (x, y, juce::Colour::fromRGBA (keepR ? c.getRed()   : (juce::uint8) 0,
+                                                             keepG ? c.getGreen() : (juce::uint8) 0,
+                                                             keepB ? c.getBlue()  : (juce::uint8) 0,
+                                                             c.getAlpha()));
+        }
+
+    return dst;
+}
+
+//==============================================================================
 void CrtLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int width, int height,
                                        float sliderPos, float startAngle, float endAngle, juce::Slider&)
 {
@@ -1080,6 +1107,12 @@ StereoImagerPanel::StereoImagerPanel (TekkChild670Processor& p)
     setup (monoKnob,    monoLb,    "MONO MAKER",     pid::monoMaker,     monoAt);
     setup (enhanceKnob, enhanceLb, "STEREO ENHANCE", pid::stereoEnhance, enhanceAt);
 
+    // the mascot on the screen, plus its red / cyan channels for the 3-D split
+    faceArt  = juce::ImageCache::getFromMemory (BinaryData::tekkchild_face_png,
+                                                BinaryData::tekkchild_face_pngSize);
+    faceRed  = makeChannelTint (faceArt, true,  false, false);
+    faceCyan = makeChannelTint (faceArt, false, true,  true);
+
     startTimerHz (30);
 }
 
@@ -1117,71 +1150,92 @@ void StereoImagerPanel::drawScreen (juce::Graphics& g, juce::Rectangle<float> ar
     g.drawRoundedRectangle (area.expanded (6.0f), 16.0f, 2.0f);
 
     juce::Path screen;
-    const float corner = juce::jmin (area.getWidth(), area.getHeight()) * 0.18f;
+    const float corner = juce::jmin (area.getWidth(), area.getHeight()) * 0.16f;
     screen.addRoundedRectangle (area.getX(), area.getY(), area.getWidth(), area.getHeight(), corner);
 
     juce::Graphics::ScopedSaveState ss (g);
     g.reduceClipRegion (screen);
 
-    // dark phosphor with a soft centre glow
-    g.setColour (juce::Colour (0xff04130a));
+    // dark CRT with a soft centre glow
+    g.setColour (juce::Colour (0xff080608));
     g.fillRect (area);
-    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff0c3a22), area.getCentreX(), area.getCentreY(),
-                                             juce::Colour (0xff02100a), area.getX(), area.getY(), true));
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff241016), area.getCentreX(), area.getCentreY(),
+                                             juce::Colour (0xff050306), area.getX(), area.getY(), true));
     g.fillRect (area);
 
-    const auto  c     = area.getCentre();
-    const float scale = juce::jmin (area.getWidth(), area.getHeight()) * 0.46f;
+    const auto c = area.getCentre();
 
-    // graticule: mono (vertical), L/R diagonals, range rings
-    g.setColour (juce::Colour (0xff2f8f5a).withAlpha (0.35f));
-    g.drawLine (c.x, area.getY() + 6.0f, c.x, area.getBottom() - 6.0f, 1.0f);
-    g.drawLine (c.x - scale, c.y - scale, c.x + scale, c.y + scale, 1.0f);
-    g.drawLine (c.x - scale, c.y + scale, c.x + scale, c.y - scale, 1.0f);
-    for (float rr = scale * 0.5f; rr <= scale + 0.5f; rr += scale * 0.5f)
-        g.drawEllipse (juce::Rectangle<float> (rr * 2.0f, rr * 2.0f).withCentre (c), 0.8f);
+    const float mono = processor.apvts.getRawParameterValue (pid::monoMaker)->load()    * 0.01f;
+    const float enh  = processor.apvts.getRawParameterValue (pid::stereoEnhance)->load() * 0.01f;
 
-    g.setColour (juce::Colour (0xff58c47e).withAlpha (0.6f));
+    // the mascot reacts to the controls: Mono Maker squeezes him narrow,
+    // Stereo Enhance stretches him wide and splits him into 3-D.
+    const float widthScale  = juce::jlimit (0.32f, 1.7f, (1.0f - 0.55f * mono) * (1.0f + 0.45f * enh));
+    const float splitPx     = 1.0f + 20.0f * enh;            // red / cyan separation
+    const float fringeAlpha = 0.12f + 0.6f  * enh;
+
+    if (faceArt.isValid())
+    {
+        auto dst = area.reduced (3.0f);
+        const float imgW = (float) faceArt.getWidth();
+        const float imgH = (float) faceArt.getHeight();
+        const float fit  = juce::jmin (dst.getWidth() / imgW, dst.getHeight() / imgH);
+        const float drawW = imgW * fit * widthScale;
+        const float drawH = imgH * fit;
+
+        const auto place = juce::AffineTransform::scale (fit * widthScale, fit)
+                               .translated (c.x - drawW * 0.5f, c.y - drawH * 0.5f);
+
+        // base full-colour mascot, brightening a touch with the signal
+        g.setOpacity (juce::jlimit (0.0f, 1.0f, 0.80f + 0.20f * litLevel));
+        g.drawImageTransformed (faceArt, place, false);
+
+        // red (shifted left) + cyan (shifted right) 3-D ghosts
+        if (faceRed.isValid() && faceCyan.isValid() && fringeAlpha > 0.02f)
+        {
+            g.setOpacity (fringeAlpha);
+            g.drawImageTransformed (faceRed,  place.followedBy (juce::AffineTransform::translation (-splitPx, 0.0f)), false);
+            g.drawImageTransformed (faceCyan, place.followedBy (juce::AffineTransform::translation ( splitPx, 0.0f)), false);
+        }
+        g.setOpacity (1.0f);
+    }
+
+    // live audio waveform across the mouth, blue like the meme
+    if (scopeCount > 1)
+    {
+        const float midY = c.y + area.getHeight() * 0.06f;
+        const float ampY = area.getHeight() * 0.12f;
+        juce::Path wave;
+        for (int i = 0; i < scopeCount; ++i)
+        {
+            const float xx = area.getX() + 8.0f + (area.getWidth() - 16.0f) * (float) i / (float) (scopeCount - 1);
+            const float yy = midY - juce::jlimit (-1.0f, 1.0f, scopeMid[i]) * ampY;
+            if (i == 0) wave.startNewSubPath (xx, yy);
+            else        wave.lineTo (xx, yy);
+        }
+        g.setColour (juce::Colour (0xff1f8dff).withAlpha (0.45f));
+        g.strokePath (wave, juce::PathStrokeType (3.0f)); // glow
+        g.setColour (juce::Colour (0xff5fd8ff).withAlpha (0.95f));
+        g.strokePath (wave, juce::PathStrokeType (1.4f));
+    }
+
+    // mode caption, lit toward whichever extreme is engaged
     g.setFont (juce::Font (juce::FontOptions (11.0f)).boldened());
-    g.drawText ("L", juce::Rectangle<float> (16, 14).withCentre ({ area.getX() + 12.0f, area.getY() + 11.0f }), juce::Justification::centred);
-    g.drawText ("R", juce::Rectangle<float> (16, 14).withCentre ({ area.getRight() - 12.0f, area.getY() + 11.0f }), juce::Justification::centred);
-    g.drawText ("M", juce::Rectangle<float> (16, 12).withCentre ({ c.x, area.getY() + 10.0f }), juce::Justification::centred);
-
-    // goniometer trace: x = side (width), y = mid (in-phase up)
-    const float enh    = processor.apvts.getRawParameterValue (pid::stereoEnhance)->load() * 0.01f;
-    const float fringe = 1.5f + enh * 4.5f;            // 3-D red/cyan split grows with enhance
-    const float bright = 0.25f + 0.75f * litLevel;
-
-    juce::Path trace;
-    bool started = false;
-    for (int i = 0; i < scopeCount; ++i)
-    {
-        const float xx = c.x + juce::jlimit (-1.2f, 1.2f, scopeSide[i]) * scale * 1.4f;
-        const float yy = c.y - juce::jlimit (-1.2f, 1.2f, scopeMid[i])  * scale * 1.1f;
-        if (! started) { trace.startNewSubPath (xx, yy); started = true; }
-        else            trace.lineTo (xx, yy);
-    }
-
-    if (started)
-    {
-        g.setColour (juce::Colour (0xffff3b3b).withAlpha (0.35f * bright));
-        g.strokePath (trace, juce::PathStrokeType (1.4f), juce::AffineTransform::translation (-fringe, 0.0f));
-        g.setColour (juce::Colour (0xff35e0ff).withAlpha (0.35f * bright));
-        g.strokePath (trace, juce::PathStrokeType (1.4f), juce::AffineTransform::translation (fringe, 0.0f));
-        g.setColour (juce::Colour (0xff7cfcb4).withAlpha (0.85f * bright));
-        g.strokePath (trace, juce::PathStrokeType (1.2f));
-    }
+    g.setColour (juce::Colour (0xff20c4ff).withAlpha (0.35f + 0.55f * enh));
+    g.drawText (enh  > 0.5f ? "3-D" : "", area.reduced (8.0f), juce::Justification::topRight);
+    g.setColour (juce::Colour (0xffe2483a).withAlpha (0.35f + 0.55f * mono));
+    g.drawText (mono > 0.5f ? "MONO" : "", area.reduced (8.0f), juce::Justification::topLeft);
 
     // scanlines + a rolling bright line
-    g.setColour (juce::Colours::black.withAlpha (0.18f));
+    g.setColour (juce::Colours::black.withAlpha (0.20f));
     for (float yy = area.getY(); yy < area.getBottom(); yy += 3.0f)
         g.drawHorizontalLine ((int) yy, area.getX(), area.getRight());
-    g.setColour (juce::Colour (0xff7cfcb4).withAlpha (0.06f));
+    g.setColour (juce::Colours::white.withAlpha (0.05f));
     g.fillRect (area.getX(), area.getY() + scanPhase * area.getHeight(), area.getWidth(), 12.0f);
 
     // vignette + glass sheen
     g.setGradientFill (juce::ColourGradient (juce::Colours::transparentBlack, c.x, c.y,
-                                             juce::Colours::black.withAlpha (0.5f), area.getX(), area.getY(), true));
+                                             juce::Colours::black.withAlpha (0.55f), area.getX(), area.getY(), true));
     g.fillRect (area);
     g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.10f), area.getX(), area.getY(),
                                              juce::Colours::transparentBlack, area.getCentreX(), area.getCentreY(), false));
