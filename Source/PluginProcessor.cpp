@@ -32,6 +32,7 @@ TekkChild670Processor::TekkChild670Processor()
 {
     using namespace tekk;
 
+#if TEKK_HAS_COMP
     for (int ch = 0; ch < 2; ++ch)
     {
         pInput[ch]        = apvts.getRawParameterValue (pid::forChannel (pid::input, ch));
@@ -56,8 +57,10 @@ TekkChild670Processor::TekkChild670Processor()
     pLinkAmount = apvts.getRawParameterValue (pid::linkAmount);
     pAutoMk     = apvts.getRawParameterValue (pid::autoMakeup);
     pSafety     = apvts.getRawParameterValue (pid::safety);
+#endif
     pPurist     = apvts.getRawParameterValue (pid::purist);
 
+#if TEKK_HAS_TAPE
     pTapeOn    = apvts.getRawParameterValue (pid::tapeOn);
     pTapePar   = apvts.getRawParameterValue (pid::tapeParallel);
     pTapeIn    = apvts.getRawParameterValue (pid::tapeInput);
@@ -70,11 +73,16 @@ TekkChild670Processor::TekkChild670Processor()
     pTapeNoise = apvts.getRawParameterValue (pid::tapeNoise);
     pTapeXtalk = apvts.getRawParameterValue (pid::tapeXtalk);
     pTapeDeg   = apvts.getRawParameterValue (pid::tapeDegrade);
+#endif
 
+#if TEKK_HAS_IMAGER
     pMonoMaker = apvts.getRawParameterValue (pid::monoMaker);
     pStereoEnh = apvts.getRawParameterValue (pid::stereoEnhance);
+#endif
 
+#if TEKK_HAS_LIMITER
     pLimitThrottle = apvts.getRawParameterValue (pid::limitThrottle);
+#endif
 
     bypassParam = dynamic_cast<juce::AudioParameterBool*> (apvts.getParameter (pid::bypass));
     jassert (bypassParam != nullptr);
@@ -87,6 +95,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout TekkChild670Processor::creat
 
     j::AudioProcessorValueTreeState::ParameterLayout layout;
 
+#if TEKK_HAS_COMP
     const juce::StringArray timeConstantChoices {
         "1 - 0.2 ms / 0.3 s", "2 - 0.2 ms / 0.8 s", "3 - 0.4 ms / 2 s",
         "4 - 0.8 ms / 5 s",   "5 - auto (2 s / 10 s)", "6 - auto (0.3 s / 10 s / 25 s)"
@@ -192,6 +201,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout TekkChild670Processor::creat
 
     layout.add (std::make_unique<j::AudioParameterBool> (
         j::ParameterID (pid::safety, 1), "Safety Clip", false));
+#endif // TEKK_HAS_COMP
 
     layout.add (std::make_unique<j::AudioParameterBool> (
         j::ParameterID (pid::purist, 1), "Purist Mode", false));
@@ -199,6 +209,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout TekkChild670Processor::creat
     layout.add (std::make_unique<j::AudioParameterBool> (
         j::ParameterID (pid::bypass, 1), "True Bypass", false));
 
+#if TEKK_HAS_TAPE
     // -- Tape Brain --
     layout.add (std::make_unique<j::AudioParameterBool> (
         j::ParameterID (pid::tapeOn, 1), "Tape Brain", false));
@@ -229,7 +240,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout TekkChild670Processor::creat
     tapeKnob (pid::tapeNoise,   "Tape Noise",      0.0f);
     tapeKnob (pid::tapeXtalk,   "Crosstalk",       0.0f);
     tapeKnob (pid::tapeDegrade, "Degrade",         0.0f);
+#endif // TEKK_HAS_TAPE
 
+#if TEKK_HAS_IMAGER
     // -- Stereo Imager (TEKKVISION) --
     layout.add (std::make_unique<j::AudioParameterFloat> (
         j::ParameterID (pid::monoMaker, 1), "Mono Maker",
@@ -239,11 +252,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout TekkChild670Processor::creat
         j::ParameterID (pid::stereoEnhance, 1), "Stereo Enhance",
         j::NormalisableRange<float> (0.0f, 100.0f, 0.1f), 0.0f,
         j::AudioParameterFloatAttributes().withLabel ("%")));
+#endif // TEKK_HAS_IMAGER
 
+#if TEKK_HAS_LIMITER
     // -- 1176 limiter (speed limit / throttle) --
     layout.add (std::make_unique<j::AudioParameterFloat> (
         j::ParameterID (pid::limitThrottle, 1), "Speed Limit",
         j::NormalisableRange<float> (0.0f, 100.0f, 1.0f), 100.0f));
+#endif
 
     return layout;
 }
@@ -255,7 +271,9 @@ void TekkChild670Processor::prepareToPlay (double sampleRate, int samplesPerBloc
     maxBlockSize   = samplesPerBlock;
 
     const auto numCh = (size_t) juce::jmax (1, juce::jmin (2, getTotalNumInputChannels()));
+    juce::ignoreUnused (numCh);
 
+#if TEKK_HAS_COMP
     using OS = juce::dsp::Oversampling<float>;
     oversamplerIIR = std::make_unique<OS> (numCh, 2, OS::filterHalfBandPolyphaseIIR, false, false);
     oversamplerFIR = std::make_unique<OS> (numCh, 2, OS::filterHalfBandFIREquiripple, true, true);
@@ -263,19 +281,6 @@ void TekkChild670Processor::prepareToPlay (double sampleRate, int samplesPerBloc
     oversamplerFIR->initProcessing ((size_t) samplesPerBlock);
 
     dryBuffer.setSize (2, samplesPerBlock);
-    tapeBuffer.setSize (2, samplesPerBlock);
-    tapeBrain.prepare (sampleRate); // tape runs at base rate on the final output
-
-    sideGainSm.reset (sampleRate, 0.03);
-    sideGainSm.setCurrentAndTargetValue (1.0f);
-
-    // 1176 limiter: instant attack, ~120 ms program release
-    limiterGain = 1.0f;
-    limRelCoef  = 1.0f - std::exp (-1.0f / (0.12f * (float) sampleRate));
-    limGrMeter.store (0.0f);
-    std::fill (std::begin (scopeMid),  std::end (scopeMid),  0.0f);
-    std::fill (std::begin (scopeSide), std::end (scopeSide), 0.0f);
-    scopeWritePos.store (0, std::memory_order_release);
 
     juce::dsp::ProcessSpec spec { sampleRate, (juce::uint32) samplesPerBlock, (juce::uint32) numCh };
     dryDelay.prepare (spec);
@@ -305,6 +310,27 @@ void TekkChild670Processor::prepareToPlay (double sampleRate, int samplesPerBloc
     eggPos    = 0;
     eggLoaded = false;
     eggBuffer.setSize (2, 0);
+#endif // TEKK_HAS_COMP
+
+#if TEKK_HAS_TAPE
+    tapeBuffer.setSize (2, samplesPerBlock);
+    tapeBrain.prepare (sampleRate); // tape runs at base rate on the final output
+#endif
+
+#if TEKK_HAS_IMAGER
+    sideGainSm.reset (sampleRate, 0.03);
+    sideGainSm.setCurrentAndTargetValue (1.0f);
+    std::fill (std::begin (scopeMid),  std::end (scopeMid),  0.0f);
+    std::fill (std::begin (scopeSide), std::end (scopeSide), 0.0f);
+    scopeWritePos.store (0, std::memory_order_release);
+#endif
+
+#if TEKK_HAS_LIMITER
+    // 1176 limiter: instant attack, ~120 ms program release
+    limiterGain = 1.0f;
+    limRelCoef  = 1.0f - std::exp (-1.0f / (0.12f * (float) sampleRate));
+    limGrMeter.store (0.0f);
+#endif
 }
 
 void TekkChild670Processor::releaseResources()
@@ -548,11 +574,13 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
         return;
     }
 
+    const bool purist = pPurist->load() > 0.5f;
+
+#if TEKK_HAS_COMP
     const int quality = juce::jlimit (0, 2, (int) pQuality->load());
     if (quality != activeQuality)
         applyQualityMode (quality, false);
 
-    const bool purist = pPurist->load() > 0.5f;
     const int  mode   = juce::jlimit (0, 2, (int) pMode->load());
     const bool msMode = mode == 1 && numCh == 2;
     const bool linked = mode == 2 && numCh == 2;
@@ -762,7 +790,9 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
 
     grMeterDb[0].store (maxGr[0]);
     grMeterDb[1].store (numCh > 1 ? maxGr[1] : maxGr[0]);
+#endif // TEKK_HAS_COMP
 
+#if TEKK_HAS_TAPE
     // Tape Brain: a tape-colour section after (series) or alongside (parallel)
     // the compressor. The throw switch picks the route; purist takes it out.
     if (! purist && pTapeOn->load() > 0.5f)
@@ -800,7 +830,9 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
     {
         tapeSatMeter.store (0.0f);
     }
+#endif // TEKK_HAS_TAPE
 
+#if TEKK_HAS_COMP
     // easter egg: mix the embedded clip on top of the output once armed
     if (eggArm.exchange (false))
     {
@@ -823,7 +855,9 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
             eggPos    = 0;
         }
     }
+#endif // TEKK_HAS_COMP
 
+#if TEKK_HAS_IMAGER
     // Stereo Imager: Mono Maker collapses the side toward 0 (mono), Stereo
     // Enhance scales it up (wider). Width = (1 + enhance) * (1 - mono), so
     // 100 % Mono Maker is fully mono regardless of Enhance. Purist takes it out.
@@ -848,7 +882,9 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
     {
         sideGainSm.skip (n); // keep the smoother's clock advancing while bypassed
     }
+#endif // TEKK_HAS_IMAGER
 
+#if TEKK_HAS_LIMITER
     // 1176 limiter: a brick-wall peak limiter whose ceiling is the "speed limit".
     // 100 % = open road (ceiling above full scale, transparent); lower clamps the
     // peaks harder. Instant attack (no overshoot), smooth program release. Linked
@@ -883,7 +919,9 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
         }
         limGrMeter.store (-juce::Decibels::gainToDecibels (minGain, -60.0f));
     }
+#endif // TEKK_HAS_LIMITER
 
+#if TEKK_HAS_COMP
     // Safety: a gentle final ceiling so heavy Drive / saturation can't push overs
     if (pSafety->load() > 0.5f)
         for (int ch = 0; ch < numCh; ++ch)
@@ -892,12 +930,14 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
             for (int i = 0; i < n; ++i)
                 w[i] = safetyClip (w[i]);
         }
+#endif
 
     for (int ch = 0; ch < numCh; ++ch)
         outMeterDb[ch].store (juce::Decibels::gainToDecibels (buffer.getMagnitude (ch, 0, n), -100.0f));
     if (numCh == 1)
         outMeterDb[1].store (outMeterDb[0].load());
 
+#if TEKK_HAS_IMAGER
     // Goniometer feed: publish the most recent mid/side of the true output.
     {
         const auto* L = buffer.getReadPointer (0);
@@ -911,6 +951,7 @@ void TekkChild670Processor::processBlock (juce::AudioBuffer<float>& buffer, juce
         }
         scopeWritePos.store (pos, std::memory_order_release);
     }
+#endif // TEKK_HAS_IMAGER
 }
 
 int TekkChild670Processor::getScopeData (float* midOut, float* sideOut, int maxN) const noexcept
@@ -931,7 +972,11 @@ int TekkChild670Processor::getScopeData (float* midOut, float* sideOut, int maxN
 //==============================================================================
 int TekkChild670Processor::getNumPrograms()
 {
+#if TEKK_HAS_COMP
     return (int) tekk::factoryPresets().size();
+#else
+    return 1; // standalone module: no preset bank
+#endif
 }
 
 int TekkChild670Processor::getCurrentProgram()
@@ -941,13 +986,21 @@ int TekkChild670Processor::getCurrentProgram()
 
 const juce::String TekkChild670Processor::getProgramName (int index)
 {
+#if TEKK_HAS_COMP
     const auto& presets = tekk::factoryPresets();
     return juce::isPositiveAndBelow (index, (int) presets.size())
                ? presets[(size_t) index].name : juce::String();
+#else
+    juce::ignoreUnused (index);
+    return TEKK_PLUGIN_NAME;
+#endif
 }
 
 void TekkChild670Processor::setCurrentProgram (int index)
 {
+#if ! TEKK_HAS_COMP
+    juce::ignoreUnused (index);
+#else
     const auto& presets = tekk::factoryPresets();
     if (! juce::isPositiveAndBelow (index, (int) presets.size()))
         return;
@@ -974,6 +1027,7 @@ void TekkChild670Processor::setCurrentProgram (int index)
 
     for (const auto& entry : preset.global)
         apply (entry.first, entry.second);
+#endif // TEKK_HAS_COMP
 }
 
 //==============================================================================

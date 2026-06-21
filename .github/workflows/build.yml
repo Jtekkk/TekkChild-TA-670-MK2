@@ -66,20 +66,32 @@ jobs:
           name: TekkChild-TC-670-measurements
           path: measurements/*.svg
 
+      # Gather every plugin (combined + the four separate modules) into one folder
+      - name: Stage all VST3 plugins
+        shell: bash
+        run: |
+          mkdir -p dist/VST3
+          for t in TekkChild670 TekkComp TekkTape TekkStereo TekkLimit; do
+            d="build/${t}_artefacts/Release/VST3"
+            [ -d "$d" ] && cp -R "$d"/*.vst3 dist/VST3/ || true
+          done
+          ls -la dist/VST3
+
       - name: Upload VST3
         uses: actions/upload-artifact@v4
         with:
           name: TekkChild-TC-670-${{ runner.os }}-VST3
-          path: build/TekkChild670_artefacts/Release/VST3/
+          path: dist/VST3/
           if-no-files-found: error
 
-      # Branded NSIS installer (mascot icon + wizard art, bundles the audio track)
+      # Branded NSIS installer (mascot icon + wizard art, bundles the audio track
+      # and every TC-670 plugin from dist/VST3)
       - name: Build Windows installer
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           choco install nsis -y --no-progress
-          $vst3dir = (Resolve-Path "build/TekkChild670_artefacts/Release/VST3").Path
+          $vst3dir = (Resolve-Path "dist/VST3").Path
           Write-Host "Packaging from: $vst3dir"
           Push-Location installer
           & "C:\Program Files (x86)\NSIS\makensis.exe" "/DVST3DIR=$vst3dir" "/DVERSION=2.0.0" TekkChild-TC-670.nsi

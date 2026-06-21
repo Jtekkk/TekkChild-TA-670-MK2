@@ -294,10 +294,8 @@ private:
 
     tekk::TekkLookAndFeel lookAndFeel;
 
+#if TEKK_HAS_COMP
     tekk::ChannelStrip stripA, stripB;
-    tekk::TapeBrainPanel tapePanel;
-    tekk::StereoImagerPanel imagerPanel;
-    tekk::LimiterPanel limiterPanel;
 
     juce::Label    presetLb;
     juce::ComboBox presetBox;
@@ -321,14 +319,25 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   driveAt, ironAt, biasAt, voltAt,
                                                                            linkAmtAt;
 
-    juce::TooltipWindow tooltips { this };
-
-    juce::Image chassis;  // cached hammered-metal background
     juce::Image faceArt;  // central faceplate graphic
     juce::Rectangle<int> faceArea;       // the framed plate
     juce::Rectangle<int> faceImageRect;  // where the artwork is drawn
 
     tekk::NoseHotspot noseHotspot;
+#endif
+
+#if TEKK_HAS_TAPE
+    tekk::TapeBrainPanel tapePanel;
+#endif
+#if TEKK_HAS_IMAGER
+    tekk::StereoImagerPanel imagerPanel;
+#endif
+#if TEKK_HAS_LIMITER
+    tekk::LimiterPanel limiterPanel;
+#endif
+
+    juce::TooltipWindow tooltips { this };
+    juce::Image chassis;  // cached hammered-metal background
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TekkChild670Editor)
 };

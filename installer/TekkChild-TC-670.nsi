@@ -84,9 +84,9 @@ Section "TC-670 Plugin (VST3)" SecVST3
   SectionIn RO
   SetRegView 64
 
-  ; the VST3 bundle goes to the shared VST3 location
+  ; every TC-670 VST3 bundle in VST3DIR goes to the shared VST3 location
   SetOutPath "$COMMONFILES64\VST3"
-  File /r "${VST3DIR}\${VST3NAME}"
+  File /r "${VST3DIR}\*.vst3"
 
   ; uninstaller + Add/Remove Programs entry
   SetOutPath "$INSTDIR"
@@ -115,7 +115,11 @@ SectionEnd
 ;-------------------------------------------------------------- uninstall
 Section "Uninstall"
   SetRegView 64
-  RMDir /r "$COMMONFILES64\VST3\${VST3NAME}"
+  RMDir /r "$COMMONFILES64\VST3\TekkChild TC-670 Vari-Mu Compressor.vst3"
+  RMDir /r "$COMMONFILES64\VST3\TC-670 Compressor.vst3"
+  RMDir /r "$COMMONFILES64\VST3\TC-670 Tape Brain.vst3"
+  RMDir /r "$COMMONFILES64\VST3\TC-670 Stereo Field.vst3"
+  RMDir /r "$COMMONFILES64\VST3\TC-670 1176 Limiter.vst3"
   Delete "$DOCUMENTS\${COMPANY}\TC-670\TEKK_Engineering_TC-670.mp3"
   RMDir  "$DOCUMENTS\${COMPANY}\TC-670"
   RMDir  "$DOCUMENTS\${COMPANY}"

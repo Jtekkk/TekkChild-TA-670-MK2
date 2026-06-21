@@ -1700,20 +1700,36 @@ void LimiterPanel::resized()
 //==============================================================================
 TekkChild670Editor::TekkChild670Editor (TekkChild670Processor& p)
     : AudioProcessorEditor (p),
-      processor (p),
-      stripA (p, 0, "CHANNEL A - LEFT / LAT"),
-      stripB (p, 1, "CHANNEL B - RIGHT / VERT"),
-      tapePanel (p),
-      imagerPanel (p),
-      limiterPanel (p)
+      processor (p)
+#if TEKK_HAS_COMP
+    , stripA (p, 0, "CHANNEL A - LEFT / LAT")
+    , stripB (p, 1, "CHANNEL B - RIGHT / VERT")
+#endif
+#if TEKK_HAS_TAPE
+    , tapePanel (p)
+#endif
+#if TEKK_HAS_IMAGER
+    , imagerPanel (p)
+#endif
+#if TEKK_HAS_LIMITER
+    , limiterPanel (p)
+#endif
 {
     setLookAndFeel (&lookAndFeel);
 
+#if TEKK_HAS_TAPE
+    addAndMakeVisible (tapePanel);
+#endif
+#if TEKK_HAS_IMAGER
+    addAndMakeVisible (imagerPanel);
+#endif
+#if TEKK_HAS_LIMITER
+    addAndMakeVisible (limiterPanel);
+#endif
+
+#if TEKK_HAS_COMP
     addAndMakeVisible (stripA);
     addAndMakeVisible (stripB);
-    addAndMakeVisible (tapePanel);
-    addAndMakeVisible (imagerPanel);
-    addAndMakeVisible (limiterPanel);
 
     auto setupGlobalBox = [this] (juce::ComboBox& box, juce::Label& label,
                                   const juce::String& text, const char* paramId)
@@ -1854,28 +1870,51 @@ TekkChild670Editor::TekkChild670Editor (TekkChild670Processor& p)
 
     refreshPresetBox();
     startTimerHz (8); // keep the box in step with host-driven program changes
+#endif // TEKK_HAS_COMP
 
-    setSize (2280, 668);
+    // window width is the sum of the modules this build actually contains
+    int w = 0;
+   #if TEKK_HAS_COMP
+    w += 972;
+   #endif
+   #if TEKK_HAS_TAPE
+    w += 468;
+   #endif
+   #if TEKK_HAS_IMAGER
+    w += 400;
+   #endif
+   #if TEKK_HAS_LIMITER
+    w += 440;
+   #endif
+    setSize (juce::jmax (320, w), 668);
 }
 
 void TekkChild670Editor::loadProgram (int index)
 {
+#if TEKK_HAS_COMP
     if (juce::isPositiveAndBelow (index, processor.getNumPrograms()))
     {
         processor.setCurrentProgram (index);
         refreshPresetBox();
     }
+#else
+    juce::ignoreUnused (index);
+#endif
 }
 
 void TekkChild670Editor::refreshPresetBox()
 {
+#if TEKK_HAS_COMP
     presetBox.setSelectedId (processor.getCurrentProgram() + 1, juce::dontSendNotification);
+#endif
 }
 
 void TekkChild670Editor::timerCallback()
 {
+#if TEKK_HAS_COMP
     if (presetBox.getSelectedId() - 1 != processor.getCurrentProgram())
         refreshPresetBox();
+#endif
 }
 
 TekkChild670Editor::~TekkChild670Editor()
@@ -1910,7 +1949,7 @@ void TekkChild670Editor::paint (juce::Graphics& g)
 
     g.setColour (tekk::colours::amber);
     g.setFont (juce::Font (juce::FontOptions (11.0f)));
-    g.drawText ("TEKK ENGINEERING AUDIO LABS  ·  VARI-MU COMPRESSOR",
+    g.drawText (juce::String (TEKK_PLUGIN_NAME).toUpperCase(),
                 header.reduced (74, 0), juce::Justification::centredRight);
 
     g.setColour (juce::Colour (0xff141416));
@@ -1925,6 +1964,7 @@ void TekkChild670Editor::paint (juce::Graphics& g)
                     juce::Point<float> ((float) getWidth() - 18.0f, (float) getHeight() - 18.0f) })
         tekk::drawScrew (g, p.x, p.y, 6.0f, 30.0f * (p.x + p.y));
 
+#if TEKK_HAS_COMP
     // central faceplate graphic, mounted between the two channel sections
     if (! faceArea.isEmpty())
     {
@@ -1988,7 +2028,9 @@ void TekkChild670Editor::paint (juce::Graphics& g)
         tekk::drawScrew (g, fa.getX() + ins,     fa.getBottom() - ins, 4.5f, 55.0f);
         tekk::drawScrew (g, fa.getRight() - ins, fa.getBottom() - ins, 4.5f, 5.0f);
     }
+#endif // TEKK_HAS_COMP
 
+#if TEKK_HAS_COMP && TEKK_HAS_TAPE
     // patch cables crossing the seam from the compressor into the Tape Brain
     if (! tapePanel.getBounds().isEmpty())
     {
@@ -2023,7 +2065,9 @@ void TekkChild670Editor::paint (juce::Graphics& g)
         patch (0.40f, juce::Colour (0xff2ce0d2));
         patch (0.56f, juce::Colour (0xffd49a3a));
     }
+#endif // TEKK_HAS_COMP && TEKK_HAS_TAPE
 
+#if TEKK_HAS_TAPE && TEKK_HAS_IMAGER
     // a cable carrying the output on into the CRT stereo imager
     if (! imagerPanel.getBounds().isEmpty())
     {
@@ -2049,6 +2093,7 @@ void TekkChild670Editor::paint (juce::Graphics& g)
             g.drawRoundedRectangle (juce::Rectangle<float> (11.0f, 8.0f).withCentre (pt), 2.0f, 1.0f);
         }
     }
+#endif // TEKK_HAS_TAPE && TEKK_HAS_IMAGER
 }
 
 void TekkChild670Editor::resized()
@@ -2060,13 +2105,17 @@ void TekkChild670Editor::resized()
     r.removeFromTop (52); // header, painted
 
     // 1176 limiter, Stereo Imager (CRT TV) and Tape Brain: modules bolted right.
-    auto limiterArea = r.removeFromRight (440);
-    limiterPanel.setBounds (limiterArea.reduced (10, 8));
-    auto imagerArea = r.removeFromRight (400);
-    imagerPanel.setBounds (imagerArea.reduced (10, 8));
-    auto tapeArea = r.removeFromRight (468);
-    tapePanel.setBounds (tapeArea.reduced (10, 8));
+#if TEKK_HAS_LIMITER
+    limiterPanel.setBounds (r.removeFromRight (440).reduced (10, 8));
+#endif
+#if TEKK_HAS_IMAGER
+    imagerPanel.setBounds (r.removeFromRight (400).reduced (10, 8));
+#endif
+#if TEKK_HAS_TAPE
+    tapePanel.setBounds (r.removeFromRight (468).reduced (10, 8));
+#endif
 
+#if TEKK_HAS_COMP
     auto presetBar = r.removeFromTop (36).reduced (16, 4);
     presetLb.setBounds (presetBar.removeFromLeft (52));
     prevPreset.setBounds (presetBar.removeFromLeft (30).reduced (1));
@@ -2144,4 +2193,5 @@ void TekkChild670Editor::resized()
     linkAmtLb.setBounds (footerRow2.removeFromLeft (44));
     linkAmtKnob.setBounds (footerRow2.removeFromLeft (200).reduced (0, 4));
     noiseBtn.setBounds (footerRow2.removeFromRight (86));
+#endif // TEKK_HAS_COMP
 }

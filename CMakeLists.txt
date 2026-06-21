@@ -65,6 +65,51 @@ target_link_libraries(TekkChild670
         juce::juce_recommended_warning_flags
 )
 
+# --- Separate single-module plugins -----------------------------------------
+# Each is the same source compiled with one TEKK_HAS_* module flag, producing a
+# standalone VST3 for just that section of the TC-670.
+function(tekk_add_module TGT PRODUCT CODE BUNDLE MODFLAG)
+    juce_add_plugin(${TGT}
+        PRODUCT_NAME              "${PRODUCT}"
+        COMPANY_NAME              "Tekk Engineering Audio Labs"
+        BUNDLE_ID                 "${BUNDLE}"
+        PLUGIN_MANUFACTURER_CODE  Teal
+        PLUGIN_CODE               ${CODE}
+        FORMATS                   ${TEKK_FORMATS}
+        IS_SYNTH                  FALSE
+        NEEDS_MIDI_INPUT          FALSE
+        NEEDS_MIDI_OUTPUT         FALSE
+        IS_MIDI_EFFECT            FALSE
+        EDITOR_WANTS_KEYBOARD_FOCUS FALSE
+        COPY_PLUGIN_AFTER_BUILD   FALSE
+        VST3_CATEGORIES           Fx
+        AU_MAIN_TYPE              kAudioUnitType_Effect
+    )
+    target_sources(${TGT} PRIVATE Source/PluginProcessor.cpp Source/PluginEditor.cpp)
+    target_include_directories(${TGT} PRIVATE Source)
+    target_compile_definitions(${TGT} PUBLIC
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_VST3_CAN_REPLACE_VST2=0
+        TEKK_MODULE_SELECTED=1
+        ${MODFLAG}=1
+    )
+    target_link_libraries(${TGT}
+        PRIVATE
+            TekkChildArt
+            juce::juce_audio_utils
+            juce::juce_dsp
+        PUBLIC
+            juce::juce_recommended_config_flags
+            juce::juce_recommended_warning_flags
+    )
+endfunction()
+
+tekk_add_module(TekkComp   "TC-670 Compressor"   Tc6C com.teal.tc670comp TEKK_HAS_COMP)
+tekk_add_module(TekkTape   "TC-670 Tape Brain"   Tc6T com.teal.tc670tape TEKK_HAS_TAPE)
+tekk_add_module(TekkStereo "TC-670 Stereo Field" Tc6I com.teal.tc670img  TEKK_HAS_IMAGER)
+tekk_add_module(TekkLimit  "TC-670 1176 Limiter" Tc6L com.teal.tc670lim  TEKK_HAS_LIMITER)
+
 # Offline DSP smoke tests (headless console app, run in CI)
 juce_add_console_app(TekkChild670Tests PRODUCT_NAME "TekkChild670Tests")
 
